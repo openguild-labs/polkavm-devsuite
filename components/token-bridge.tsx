@@ -6,30 +6,68 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ArrowUpDown, Wallet, ChevronDown, Zap, Clock, Copy, Check } from "lucide-react"
+import { 
+  supportedChains, 
+  supportedPolkaVMChains, 
+  type SupportedChain, 
+  type SupportedPolkaVMChain,
+  getChainConfig,
+  getPolkaVMChainConfig
+} from "@/lib/chains"
+import { ConnectButton } from "./connect-button"
+import { useWallet } from "@/hooks/use-wallet"
 
-const networks = [
-  { id: "paseoah", name: "Paseo Asset Hub", symbol: "PAS", color: "bg-pink-500" },
-  { id: "paseoah", name: "Paseo Asset Hub", symbol: "PAS", color: "bg-green-500" },
+// Color mapping for network icons
+const networkColors: Record<string, string> = {
+  polkadot: "bg-pink-500",
+  kusama: "bg-green-500", 
+  westend: "bg-blue-500",
+  paseo: "bg-purple-500",
+  paseoah: "bg-orange-500",
+  paseoAssetHub: "bg-red-500"
+}
 
-]
+// Convert supportedChains to format expected by UI
+const fromNetworks = Object.entries(supportedChains).map(([key, config]) => ({
+  id: key as SupportedChain,
+  name: config.displayName,
+  symbol: config.symbol,
+  color: networkColors[key] || "bg-gray-500"
+}))
+
+// Convert supportedPolkaVMChains to format expected by UI  
+const toNetworks = Object.entries(supportedPolkaVMChains).map(([key, config]) => ({
+  id: key as SupportedPolkaVMChain,
+  name: config.displayName,
+  symbol: config.symbol,
+  color: networkColors[key] || "bg-blue-500"
+}))
 
 const tokens = [
-  { symbol: "PAS", name: "Paseo Token", balance: "2.4567", price: "$3,245.67" },
+  { symbol: "PAS", name: "Paseo Token", balance: "2.4567", price: "$" },
 
 ]
 
 export function TokenBridge() {
-  const [fromNetwork, setFromNetwork] = useState(networks[0]) // Substrate
-  const [toNetwork, setToNetwork] = useState(networks[1]) // Balance EVM
+  const { isConnected } = useWallet()
+  const [fromNetwork, setFromNetwork] = useState(fromNetworks[0]) // First supported chain
+  const [toNetwork, setToNetwork] = useState(toNetworks[0]) // First supported PolkaVM chain
   const [selectedToken, setSelectedToken] = useState(tokens[0])
   const [amount, setAmount] = useState("")
   const [recipientAddress, setRecipientAddress] = useState("")
-  const [isConnected, setIsConnected] = useState(false)
   const [addressCopied, setAddressCopied] = useState(false)
 
   const swapNetworks = () => {
-    setFromNetwork(toNetwork)
-    setToNetwork(fromNetwork)
+    // Since from and to networks are different types, we'll cycle through available options
+    const currentFromIndex = fromNetworks.findIndex(n => n.id === fromNetwork.id)
+    const currentToIndex = toNetworks.findIndex(n => n.id === toNetwork.id)
+    
+    // Cycle to next available network in each category
+    const nextFromIndex = (currentFromIndex + 1) % fromNetworks.length
+    const nextToIndex = (currentToIndex + 1) % toNetworks.length
+    
+    setFromNetwork(fromNetworks[nextFromIndex])
+    setToNetwork(toNetworks[nextToIndex])
   }
 
   const copyAddress = async () => {
@@ -57,13 +95,7 @@ export function TokenBridge() {
           </div>
 
           <div className="flex items-center gap-4">
-            <Button
-              onClick={() => setIsConnected(!isConnected)}
-              className={isConnected ? "bg-primary hover:bg-primary/90" : "bg-secondary hover:bg-secondary/80"}
-            >
-              <Wallet className="w-4 h-4 mr-2" />
-              {isConnected ? "Connected" : "Connect Wallet"}
-            </Button>
+            <ConnectButton />
           </div>
         </div>
       </header>
@@ -71,9 +103,9 @@ export function TokenBridge() {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold mb-3 text-balance">Bridge Your Tokens</h2>
+          <h2 className="text-3xl font-bold mb-3 text-balance">Bridge Your Tokens to PolkaVM Asset Hub</h2>
           <p className="text-muted-foreground text-pretty">
-            Convert native tokens to Balance PolkaVM Asset Hub tokens seamlessly 
+            Convert native tokens to PolkaVM Asset Hub tokens seamlessly 
           </p>
         </div>
 
@@ -162,7 +194,7 @@ export function TokenBridge() {
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">To</label>
               <Badge variant="outline" className="text-xs">
-                PolkaVM Asset Hub 
+                {toNetwork.name}
               </Badge>
             </div>
 
@@ -189,7 +221,7 @@ export function TokenBridge() {
                   </div>
                   <div className="flex-1">
                     <div className="font-medium">{selectedToken.symbol}</div>
-                    <div className="text-xs text-muted-foreground">EVM {selectedToken.name}</div>
+                    <div className="text-xs text-muted-foreground">PolkaVM {selectedToken.name}</div>
                   </div>
                 </div>
               </Card>
@@ -198,7 +230,7 @@ export function TokenBridge() {
             <Card className="p-4 bg-secondary/30 border-border/50">
               <div className="text-2xl font-mono text-muted-foreground">{amount || "0.0"}</div>
               <div className="text-sm text-muted-foreground mt-1">
-                You will receive ≈ {amount || "0.0"} EVM {selectedToken.symbol}
+                You will receive ≈ {amount || "0.0"} PolkaVM {selectedToken.symbol}
               </div>
             </Card>
           </div>
@@ -208,7 +240,7 @@ export function TokenBridge() {
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">Recipient Address</label>
               <Badge variant="outline" className="text-xs">
-                Balance EVM Address
+                PolkaVM Address
               </Badge>
             </div>
 
@@ -247,7 +279,7 @@ export function TokenBridge() {
             )}
 
             <p className="text-xs text-muted-foreground">
-              Enter the Balance EVM address where you want to receive your tokens. Make sure you control this address.
+              Enter the PolkaVM address where you want to receive your tokens. Make sure you control this address.
             </p>
           </div>
 
