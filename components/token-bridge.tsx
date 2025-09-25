@@ -6,23 +6,25 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ArrowUpDown, Wallet, ChevronDown, Zap, Clock, Copy, Check } from "lucide-react"
-import { 
-  supportedChains, 
-  supportedPolkaVMChains, 
-  type SupportedChain, 
+import {
+  supportedChains,
+  supportedPolkaVMChains,
+  type SupportedChain,
   type SupportedPolkaVMChain,
   getChainConfig,
   getPolkaVMChainConfig
 } from "@/lib/chains"
 import { ConnectButton } from "./connect-button"
 import { useWallet } from "@/hooks/use-wallet"
-import { chainClient$ } from "@/lib/chain"
+import { chainClient$, switchToChain } from "@/lib/chain"
 import { useStateObservable } from "@react-rxjs/core"
+import { toast } from "sonner"
+import { Binary } from "polkadot-api"
 
 // Color mapping for network icons
 const networkColors: Record<string, string> = {
   polkadot: "bg-pink-500",
-  kusama: "bg-green-500", 
+  kusama: "bg-green-500",
   westend: "bg-blue-500",
   paseo: "bg-purple-500",
   paseoah: "bg-orange-500",
@@ -46,7 +48,7 @@ const toNetworks = Object.entries(supportedPolkaVMChains).map(([key, config]) =>
 }))
 
 const tokens = [
-  { symbol: "PAS", name: "Paseo Token", price: "$" },
+  { symbol: "WND", name: "Westend Token", price: "$" },
 ]
 
 export function TokenBridge() {
@@ -60,6 +62,8 @@ export function TokenBridge() {
   const [addressCopied, setAddressCopied] = useState(false)
   const [accountBalance, setAccountBalance] = useState<string>("0.0000")
   const [isLoadingBalance, setIsLoadingBalance] = useState(false)
+  const [isBridging, setIsBridging] = useState(false)
+  const [bridgeError, setBridgeError] = useState<string | null>(null)
 
   // Format balance from planck to human readable
   const formatBalance = (balance: bigint, decimals: number = 10): string => {
@@ -79,14 +83,22 @@ export function TokenBridge() {
       fromNetwork: fromNetwork.id
     })
 
+    // Check if we can access the chain client from window (development fallback)
+    const windowClient = typeof window !== 'undefined' ? (window as any).__PAPI_CLIENT__ : null
+    const windowApi = typeof window !== 'undefined' ? (window as any).__PAPI_API__ : null
+    console.log('🔍 Window fallback check:', {
+      windowClient: !!windowClient,
+      windowApi: !!windowApi
+    })
+
     if (!selectedAccount?.address) {
       console.log('❌ No selected account address')
       setAccountBalance("0.0000")
       return
     }
 
-    if (!chainClient?.typedApi) {
-      console.log('❌ No chain client or typed API available')
+    if (!chainClient?.typedApi && !windowApi) {
+      console.log('❌ No chain client or typed API available (neither from chainClient nor window)')
       setAccountBalance("0.0000")
       return
     }
@@ -94,7 +106,7 @@ export function TokenBridge() {
     setIsLoadingBalance(true)
     try {
       console.log(`🔍 Fetching balance for ${selectedAccount.address} on chain ${fromNetwork.id}...`)
-      
+
       // Check if the address is valid
       if (!selectedAccount.address.startsWith('5') || selectedAccount.address.length !== 48) {
         console.error('❌ Invalid address format:', selectedAccount.address)
@@ -102,15 +114,25 @@ export function TokenBridge() {
         return
       }
 
-      const account = await chainClient.typedApi.query.System.Account.getValue(selectedAccount.address)
+      // Use chainClient.typedApi if available, otherwise fallback to window API
+      const apiToUse = chainClient?.typedApi || windowApi
+      if (!apiToUse) {
+        console.error('❌ No API available for balance query')
+        setAccountBalance("0.0000")
+        return
+      }
+
+      console.log('🔍 Using API:', chainClient?.typedApi ? 'chainClient.typedApi' : 'window.__PAPI_API__')
+
+      const account = await apiToUse.query.System.Account.getValue(selectedAccount.address)
       console.log('📊 Raw account data:', account)
-      
+
       const balance = account.data.free
       console.log('💰 Raw balance (planck):', balance.toString())
-      
-      const decimals = fromNetwork.id === 'paseoah' ? 10 : 10
+
+      const decimals = fromNetwork.id === 'wah' ? 10 : 10
       const formattedBalance = formatBalance(balance, decimals)
-      
+
       setAccountBalance(formattedBalance)
       console.log(`✅ Balance for ${selectedAccount.address}: ${formattedBalance} ${selectedToken.symbol}`)
     } catch (error) {
@@ -125,13 +147,24 @@ export function TokenBridge() {
     }
   }
 
+  // Synchronize fromNetwork with the chainClient
+  useEffect(() => {
+    console.log(`🔄 Switching to chain: ${fromNetwork.id} (${fromNetwork.name})`)
+    switchToChain(fromNetwork.id)
+  }, [fromNetwork.id])
+
   // Fetch balance when account or chain changes
   useEffect(() => {
     console.log('🔄 useEffect triggered for balance fetch:', {
       selectedAccountAddress: selectedAccount?.address,
       hasChainClient: !!chainClient,
       hasTypedApi: !!chainClient?.typedApi,
-      fromNetworkId: fromNetwork.id
+      fromNetworkId: fromNetwork.id,
+      chainClientDetails: chainClient ? {
+        client: !!chainClient.client,
+        typedApi: !!chainClient.typedApi,
+        chainName: chainClient.chainName
+      } : null
     })
     fetchAccountBalance()
   }, [selectedAccount?.address, chainClient?.typedApi, fromNetwork.id])
@@ -140,11 +173,11 @@ export function TokenBridge() {
     // Since from and to networks are different types, we'll cycle through available options
     const currentFromIndex = fromNetworks.findIndex(n => n.id === fromNetwork.id)
     const currentToIndex = toNetworks.findIndex(n => n.id === toNetwork.id)
-    
+
     // Cycle to next available network in each category
     const nextFromIndex = (currentFromIndex + 1) % fromNetworks.length
     const nextToIndex = (currentToIndex + 1) % toNetworks.length
-    
+
     setFromNetwork(fromNetworks[nextFromIndex])
     setToNetwork(toNetworks[nextToIndex])
   }
@@ -159,6 +192,174 @@ export function TokenBridge() {
 
   const isValidEvmAddress = (address: string) => {
     return /^0x[a-fA-F0-9]{40}$/.test(address)
+  }
+
+  // Convert amount to planck (native chain units)
+  const amountToPlanck = (amount: string, decimals: number = 10): bigint => {
+    if (!amount || isNaN(Number(amount))) return BigInt(0)
+    const multiplier = BigInt(10 ** decimals)
+    const wholePart = BigInt(Math.floor(Number(amount)))
+    const fractionalPart = Number(amount) - Number(wholePart)
+    const fractionalPlanck = BigInt(Math.floor(fractionalPart * Number(multiplier)))
+    return wholePart * multiplier + fractionalPlanck
+  }
+
+  // Bridge native tokens to PolkaVM
+  const bridgeTokens = async () => {
+    if (!selectedAccount?.address || !chainClient?.typedApi || !amount || !recipientAddress) {
+      console.error('❌ Missing required data for bridge transaction')
+      return
+    }
+
+    setIsBridging(true)
+    setBridgeError(null)
+
+    try {
+      console.log('🌉 Starting bridge transaction...')
+      console.log('📋 Transaction details:', {
+        from: selectedAccount.address,
+        to: recipientAddress,
+        amount: amount,
+        chainId: fromNetwork.id
+      })
+
+      toast.loading('Preparing bridge transaction...', { id: 'bridge-tx' })
+
+      // Validate amount
+      if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+        throw new Error('Invalid amount. Please enter a valid positive number.')
+      }
+
+      // Convert amount to planck units (native chain decimals)
+      const decimals = fromNetwork.id === 'wah' ? 12 : 10
+      const valueInPlanck = amountToPlanck(amount, decimals)
+      
+      console.log('💰 Amount conversion:', {
+        input: amount,
+        decimals: decimals,
+        planck: valueInPlanck.toString(),
+        valueType: typeof valueInPlanck
+      })
+
+      // Validate conversion result
+      if (valueInPlanck === undefined || valueInPlanck === null) {
+        throw new Error('Failed to convert amount to blockchain units.')
+      }
+
+      // Prepare revive.call transaction
+      const call = chainClient.typedApi.tx.Revive.call({
+        dest: Binary.fromHex(recipientAddress), // EVM address
+        value: valueInPlanck, // Amount in native chain units (planck) - already bigint
+        gas_limit: {
+          // computation cost
+          ref_time: BigInt(1e12),
+          // storage cost  
+          proof_size: BigInt(1e6), 
+        },
+        storage_deposit_limit: BigInt(1000000000000000), // Storage deposit limit
+        data: Binary.fromHex("0x")// Empty data
+      })
+
+      console.log('📝 Transaction prepared:', call)
+
+      // Get the signer from the selected account
+      console.log('🔍 Checking signer:', {
+        hasSelectedAccount: !!selectedAccount,
+        hasPolkadotSigner: !!selectedAccount?.polkadotSigner,
+        signerType: typeof selectedAccount?.polkadotSigner,
+        signerKeys: selectedAccount?.polkadotSigner ? Object.keys(selectedAccount.polkadotSigner) : 'N/A'
+      })
+
+      if (!selectedAccount.polkadotSigner) {
+        console.error('❌ No signer available for selected account:', selectedAccount)
+        
+        // Try to get a fresh signer as a fallback
+        console.log('🔄 Attempting to get fresh signer...')
+        try {
+          const { web3FromSource } = await import('@polkadot/extension-dapp')
+          const injector = await web3FromSource(selectedAccount.walletId || 'polkadot-js')
+          const freshSigner = injector.signer
+          
+          if (freshSigner) {
+            console.log('✅ Fresh signer obtained successfully')
+            selectedAccount.polkadotSigner = freshSigner as any
+          } else {
+            throw new Error('Fresh signer is also null')
+          }
+        } catch (signerError) {
+          console.error('❌ Failed to get fresh signer:', signerError)
+          throw new Error(`No signer available for the selected account (${selectedAccount.address}). Please reconnect your wallet.`)
+        }
+      }
+
+      console.log('✅ Using signer for account:', selectedAccount.address, 'from wallet:', selectedAccount.walletName)
+
+      console.log('✍️ Signing transaction...')
+      toast.loading('Please sign the transaction in your wallet...', { id: 'bridge-tx' })
+      console.log("Signer:", selectedAccount.polkadotSigner);
+      // Sign and submit the transaction
+      const result = await call.signAndSubmit(selectedAccount.polkadotSigner)
+
+      toast.loading('Transaction submitted, waiting for confirmation...', { id: 'bridge-tx' })
+
+      console.log('📤 Transaction submitted:', result)
+
+      // Wait for transaction to be included in block
+      await new Promise((resolve, reject) => {
+        result.subscribe({
+          next: (event: any) => {
+            console.log('📋 Transaction event:', event)
+            if (event.type === 'txBestBlocksState' && event.found) {
+              if (event.ok) {
+                console.log('✅ Transaction successful!')
+                resolve(event)
+              } else {
+                console.error('❌ Transaction failed:', event.error)
+                reject(new Error(event.error?.type || 'Transaction failed'))
+              }
+            }
+          },
+          error: (error: any) => {
+            console.error('❌ Transaction error:', error)
+            reject(error)
+          }
+        })
+      })
+
+      // Refresh balance after successful transaction
+      await fetchAccountBalance()
+
+      console.log('🎉 Bridge transaction completed successfully!')
+
+      toast.success(
+        <div className="space-y-1">
+          <div className="font-medium">Bridge successful! 🎉</div>
+          <div className="text-sm text-muted-foreground">
+            {amount} {selectedToken.symbol} bridged to PolkaVM
+          </div>
+        </div>,
+        { id: 'bridge-tx', duration: 5000 }
+      )
+
+      // Clear form
+      setAmount("")
+      setRecipientAddress("")
+
+    } catch (error) {
+      console.error('❌ Bridge transaction failed:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Bridge transaction failed'
+      setBridgeError(errorMessage)
+
+      toast.error(
+        <div className="space-y-1">
+          <div className="font-medium">Bridge failed ❌</div>
+          <div className="text-sm text-muted-foreground">{errorMessage}</div>
+        </div>,
+        { id: 'bridge-tx', duration: 5000 }
+      )
+    } finally {
+      setIsBridging(false)
+    }
   }
 
   return (
@@ -184,9 +385,47 @@ export function TokenBridge() {
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold mb-3 text-balance">Bridge Your Tokens to PolkaVM Asset Hub</h2>
           <p className="text-muted-foreground text-pretty">
-            Convert native tokens to PolkaVM Asset Hub tokens seamlessly 
+            Convert native tokens to PolkaVM Asset Hub tokens seamlessly
           </p>
         </div>
+
+        {/* Debug Info (Development Only) */}
+        {process.env.NODE_ENV === 'development' && (
+          <Card className="p-4 mb-6 bg-yellow-50 border-yellow-200">
+            <div className="text-sm space-y-2">
+              <div className="font-medium text-yellow-800">🔍 Debug Info:</div>
+              <div className="text-yellow-700">
+                <div>From Network: {fromNetwork.name} ({fromNetwork.id})</div>
+                <div>Selected Account: {selectedAccount?.address || 'None'}</div>
+                <div>Account Wallet: {selectedAccount?.walletName || 'None'}</div>
+                <div>Signer Available: {selectedAccount?.polkadotSigner ? '✅ Yes' : '❌ No'}</div>
+                <div>Chain Client: {chainClient ? `✅ ${chainClient.chainName}` : '❌ Not connected'}</div>
+                <div>Balance: {accountBalance} {selectedToken.symbol}</div>
+                <div>Is Loading: {isLoadingBalance ? 'Yes' : 'No'}</div>
+                <div>Is Bridging: {isBridging ? 'Yes' : 'No'}</div>
+                {bridgeError && <div className="text-red-600">Error: {bridgeError}</div>}
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Bridge Error Display */}
+        {bridgeError && (
+          <Card className="p-4 mb-6 bg-red-50 border-red-200">
+            <div className="text-sm">
+              <div className="font-medium text-red-800 mb-2">❌ Bridge Transaction Failed</div>
+              <div className="text-red-700">{bridgeError}</div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setBridgeError(null)}
+                className="mt-2 text-red-600 hover:text-red-800"
+              >
+                Dismiss
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {/* Bridge Card */}
         <Card className="p-6 token-card-hover glow-effect">
@@ -202,7 +441,16 @@ export function TokenBridge() {
 
             <div className="grid grid-cols-2 gap-4">
               <Card className="p-4 bg-secondary/50 border-border/50">
-                <div className="flex items-center gap-3 cursor-pointer">
+                <div
+                  className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2"
+                  onClick={() => {
+                    const currentIndex = fromNetworks.findIndex(n => n.id === fromNetwork.id)
+                    const nextIndex = (currentIndex + 1) % fromNetworks.length
+                    const newNetwork = fromNetworks[nextIndex]
+                    console.log(`🔄 Switching from ${fromNetwork.name} to ${newNetwork.name}`)
+                    setFromNetwork(newNetwork)
+                  }}
+                >
                   <div
                     className={`w-8 h-8 ${fromNetwork.color} rounded-full flex items-center justify-center text-white text-sm font-bold`}
                   >
@@ -251,19 +499,36 @@ export function TokenBridge() {
 
             <div className="flex justify-between text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
-                <span>
+              <span>
                   Balance: {isLoadingBalance ? "Loading..." : `${accountBalance} ${selectedToken.symbol}`}
-                </span>
+              </span>
                 {selectedAccount?.address && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={fetchAccountBalance}
-                    disabled={isLoadingBalance}
-                    className="h-6 px-2 text-xs"
-                  >
-                    🔄
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={fetchAccountBalance}
+                      disabled={isLoadingBalance}
+                      className="h-6 px-2 text-xs"
+                    >
+                      🔄
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        console.log('🧪 Manual test - Chain client state:', {
+                          chainClient: chainClient,
+                          windowClient: (window as any).__PAPI_CLIENT__,
+                          windowApi: (window as any).__PAPI_API__,
+                          selectedAccount: selectedAccount
+                        })
+                      }}
+                      className="h-6 px-2 text-xs"
+                    >
+                      🧪
+                    </Button>
+                  </div>
                 )}
               </div>
               <span>{selectedToken.price}</span>
@@ -343,8 +608,7 @@ export function TokenBridge() {
                 placeholder="0x742d35Cc6634C0532925a3b8D4C9db96590e4CAb"
                 value={recipientAddress}
                 onChange={(e) => setRecipientAddress(e.target.value)}
-                className={`pr-12 ${
-                  recipientAddress && !isValidEvmAddress(recipientAddress)
+                className={`pr-12 ${recipientAddress && !isValidEvmAddress(recipientAddress)
                     ? "border-red-500 focus:border-red-500"
                     : recipientAddress && isValidEvmAddress(recipientAddress)
                       ? "border-green-500 focus:border-green-500"
@@ -379,15 +643,20 @@ export function TokenBridge() {
           {/* Bridge Button */}
           <Button
             className="w-full h-12 text-lg font-semibold bg-primary hover:bg-primary/90 glow-effect"
-            disabled={!isConnected || !amount || !recipientAddress || !isValidEvmAddress(recipientAddress)}
+            disabled={!isConnected || !amount || !recipientAddress || !isValidEvmAddress(recipientAddress) || isBridging}
+            onClick={bridgeTokens}
           >
-            {!isConnected
+            {isBridging
+              ? "🔄 Bridging..."
+              : !isConnected
               ? "Connect Wallet to Bridge"
               : !recipientAddress
                 ? "Enter Recipient Address"
                 : !isValidEvmAddress(recipientAddress)
                   ? "Invalid EVM Address"
-                  : "Bridge Tokens"}
+                    : !amount
+                      ? "Enter Amount"
+                      : `Bridge ${amount} ${selectedToken.symbol}`}
           </Button>
         </Card>
       </div>

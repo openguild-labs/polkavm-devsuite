@@ -80,14 +80,34 @@ export const supportedChains = {
   //   descriptorName: "paseo",
   //   isTestnet: true,
   // },
-  paseoah: {
-    name: "paseoah",
-    displayName: "Paseo Asset Hub",
-    symbol: "PAS",
-    decimals: 10,
-    wsUrls: ["wss://asset-hub-paseo-rpc.n.dwellir.com", "wss://pas-rpc.stakeworld.io/assethub"],
-    chainSpec: () => import("polkadot-api/chains/paseo_asset_hub"),
-    descriptorName: "paseoah",
+  // paseoah: {
+  //   name: "paseoah",
+  //   displayName: "Paseo Asset Hub",
+  //   symbol: "PAS",
+  //   decimals: 10,
+  //   wsUrls: ["wss://asset-hub-paseo-rpc.n.dwellir.com", "wss://pas-rpc.stakeworld.io/assethub"],
+  //   chainSpec: () => import("polkadot-api/chains/paseo_asset_hub"),
+  //   descriptorName: "paseoah",
+  //   isTestnet: true,
+  // },
+  // passet: {
+  //   name: "passet",
+  //   displayName: "Passet Hub",
+  //   symbol: "PAS",
+  //   decimals: 10,
+  //   wsUrls: ["wss://testnet-passet-hub.polkadot.io"],
+  //   chainSpec: () => import("polkadot-api/chains/paseo_asset_hub"),
+  //   descriptorName: "passet",
+  //   isTestnet: true,
+  // }
+  wah:{
+    name: "wah",
+    displayName: "Westend Asset Hub",
+    symbol: "WND",
+    decimals: 12,
+    wsUrls: ["wss://westend-asset-hub-rpc.polkadot.io"],
+    chainSpec: () => import("polkadot-api/chains/westend2_asset_hub"),
+    descriptorName: "wah",
     isTestnet: true,
   }
 } as const;
@@ -97,7 +117,7 @@ export const supportedPolkaVMChains = {
 
   paseoAssetHub: {
     name: "paseoAssetHub",
-    displayName: "Paseo Asset Hub",
+    displayName: "Paseo PolkaVM Asset Hub",
     symbol: "PAS",
     rpc: "https://testnet-passet-hub-eth-rpc.polkadot.io",
     chainId: 420420422

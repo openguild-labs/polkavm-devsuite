@@ -1,4 +1,6 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from "react"
+"use client"
+
+import React, { useState, useEffect, createContext, useContext, ReactNode } from "react"
 import type { InjectedPolkadotAccount } from "@/features/wallet-connect/pjs-signer/types"
 
 interface WalletContextType {
@@ -85,11 +87,22 @@ export function WalletProvider({ children }: WalletProviderProps) {
     }
   }
 
+  // Enhanced setSelectedAccount with logging
+  const enhancedSetSelectedAccount = (account: InjectedPolkadotAccount | null) => {
+    console.log('🏦 WalletProvider: Setting account:', {
+      address: account?.address || 'null',
+      hasSigner: !!account?.polkadotSigner,
+      signerType: account?.polkadotSigner ? typeof account.polkadotSigner : 'null',
+      walletName: account?.walletName || 'unknown'
+    })
+    setSelectedAccount(account)
+  }
+
   const contextValue: WalletContextType = {
     selectedAccount,
     isConnected,
     allAccounts,
-    setSelectedAccount,
+    setSelectedAccount: enhancedSetSelectedAccount,
     disconnect
   }
 

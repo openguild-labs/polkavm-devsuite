@@ -12,6 +12,11 @@ export function ConnectButton() {
   const { selectedAccount, isConnected, disconnect, setSelectedAccount } = useWallet()
 
   const handleAccountSelect = (account: InjectedPolkadotAccount) => {
+    console.log('📤 ConnectButton: Account selected with signer:', {
+      address: account.address,
+      hasSigner: !!account.polkadotSigner,
+      signerType: account.polkadotSigner ? typeof account.polkadotSigner : 'null'
+    })
     setSelectedAccount(account)
     close()
   }

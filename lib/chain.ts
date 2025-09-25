@@ -1,4 +1,4 @@
-import { paseoah } from "@polkadot-api/descriptors"
+import { paseoah, wah } from "@polkadot-api/descriptors"
 import { state } from "@react-rxjs/core"
 import { createClient } from "polkadot-api"
 import { withLogsRecorder } from "polkadot-api/logs-provider"
@@ -87,7 +87,7 @@ export async function createChainClient(chainName: SupportedChain = DEFAULT_CHAI
   const client = createClient(provider)
   
   // Get the typed API - in real apps, you'd import different descriptors per chain
-  const typedApi = client.getTypedApi(paseoah)
+  const typedApi = client.getTypedApi(wah)
   
   // Expose to browser devtools in development for easy debugging
   if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {

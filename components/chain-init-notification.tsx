@@ -6,11 +6,15 @@ import { useLightClient, supportedChains, type SupportedChain } from "@/lib/chai
 import { createChainClient } from "@/lib/chain"
 
 const waitChainReady = async (chainName: SupportedChain) => {
-  const { client } = createChainClient(chainName)
+  console.log(`🔧 ChainInitNotification: Creating chain client for ${chainName}...`)
+  const { client } = await createChainClient(chainName)
+  console.log(`✅ ChainInitNotification: Chain client created for ${chainName}`)
+  
   // Wait for first finalized block to ensure chain is ready
   await new Promise((resolve) => {
     const subscription = client.finalizedBlock$.subscribe(() => {
       subscription.unsubscribe()
+      console.log(`✅ ChainInitNotification: ${chainName} is ready`)
       resolve(void 0)
     })
   })
