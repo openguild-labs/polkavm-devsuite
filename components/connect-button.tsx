@@ -1,97 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Wallet, User } from "lucide-react"
 import { AccountSelectDrawer } from "./account-select-drawer"
 import { useOpenClose } from "@/hooks/use-open-close"
+import { useWallet } from "@/hooks/use-wallet"
 import type { InjectedPolkadotAccount } from "@/features/wallet-connect/pjs-signer/types"
 
 export function ConnectButton() {
   const { open, close, isOpen } = useOpenClose()
-  const [selectedAccount, setSelectedAccount] = useState<InjectedPolkadotAccount | null>(null)
-  const [polkadotJSAccounts, setPolkadotJSAccounts] = useState<InjectedPolkadotAccount[]>([])
-  const [walletConnectAccounts, setWalletConnectAccounts] = useState<InjectedPolkadotAccount[]>([])
-
-  // Load Polkadot JS accounts on mount
-  useEffect(() => {
-    const loadPolkadotJSAccounts = async () => {
-      if (typeof window === 'undefined') return
-      
-      try {
-        // Check if Polkadot JS extension is available
-        const injectedWeb3 = (window as any).injectedWeb3
-        if (!injectedWeb3?.['polkadot-js']) return
-
-        const { web3Accounts, web3Enable } = await import('@polkadot/extension-dapp')
-        
-        // Enable the extension
-        const extensions = await web3Enable('PolkaVM Bridge')
-        if (extensions.length === 0) return
-
-        // Get accounts
-        const accounts = await web3Accounts()
-        
-        // Convert to InjectedPolkadotAccount format (simplified)
-        const polkadotAccounts = accounts.map((account: any) => ({
-          address: account.address,
-          name: account.meta.name || 'Polkadot Account',
-          polkadotSigner: null as any, // TODO: Implement proper signer
-          genesisHash: account.meta.genesisHash,
-          type: account.type as any
-        }))
-        
-        setPolkadotJSAccounts(polkadotAccounts)
-        
-        // Auto-select first account if none selected
-        if (!selectedAccount && polkadotAccounts.length > 0) {
-          setSelectedAccount(polkadotAccounts[0])
-        }
-      } catch (error) {
-        console.error('Failed to load Polkadot JS accounts:', error)
-      }
-    }
-
-      loadPolkadotJSAccounts()
-    }, [selectedAccount])
-
-  // Subscribe to WalletConnect accounts
-  useEffect(() => {
-    let subscription: any
-    
-    const subscribeToWalletConnect = async () => {
-      try {
-        const { wcAccounts$ } = await import('@/features/wallet-connect/accounts.state')
-        subscription = wcAccounts$.subscribe((accounts) => {
-          setWalletConnectAccounts(accounts)
-        })
-      } catch (error) {
-        console.error('Failed to subscribe to WalletConnect accounts:', error)
-      }
-    }
-
-    subscribeToWalletConnect()
-
-    return () => {
-      if (subscription) {
-        subscription.unsubscribe()
-      }
-    }
-  }, [])
-
-  // Auto-select from accounts if available
-  useEffect(() => {
-    if (!selectedAccount) {
-      if (polkadotJSAccounts.length > 0) {
-        setSelectedAccount(polkadotJSAccounts[0])
-      } else if (walletConnectAccounts.length > 0) {
-        setSelectedAccount(walletConnectAccounts[0])
-      }
-    }
-  }, [walletConnectAccounts, polkadotJSAccounts, selectedAccount])
-
-  const allAccounts = [...polkadotJSAccounts, ...walletConnectAccounts]
-  const isConnected = selectedAccount !== null
+  const { selectedAccount, isConnected, disconnect, setSelectedAccount } = useWallet()
 
   const handleAccountSelect = (account: InjectedPolkadotAccount) => {
     setSelectedAccount(account)
@@ -102,13 +20,9 @@ export function ConnectButton() {
     return `${address.slice(0, chars + 2)}...${address.slice(-chars)}`
   }
 
-  const disconnect = () => {
-    setSelectedAccount(null)
-  }
-
   return (
     <>
-      {isConnected ? (
+      {isConnected && selectedAccount ? (
         <div className="flex items-center gap-2">
           <Button
             variant="outline"

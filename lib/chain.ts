@@ -1,4 +1,4 @@
-import { paseo } from "@polkadot-api/descriptors"
+import { paseoah } from "@polkadot-api/descriptors"
 import { state } from "@react-rxjs/core"
 import { createClient } from "polkadot-api"
 import { withLogsRecorder } from "polkadot-api/logs-provider"
@@ -11,7 +11,7 @@ import { getWsProvider } from "polkadot-api/ws-provider"
 import { map, take, switchMap, startWith, BehaviorSubject, from } from "rxjs"
 import { supportedChains, shuffleArray, type SupportedChain } from "./chains"
 
-export const DEFAULT_CHAIN: SupportedChain = "paseo" as SupportedChain
+export const DEFAULT_CHAIN: SupportedChain = "paseoah" as SupportedChain
 
 // Reactive selected chain
 export const selectedChain$ = new BehaviorSubject<SupportedChain>(DEFAULT_CHAIN)
@@ -80,14 +80,14 @@ function getProvider(chainName: SupportedChain) {
 }
 
 // Create PAPI client for specific chain
-export function createChainClient(chainName: SupportedChain = DEFAULT_CHAIN) {
-
-
-  const provider = getProvider(chainName)
+export async function createChainClient(chainName: SupportedChain = DEFAULT_CHAIN) {
+  console.log(`🔧 Creating chain client for ${chainName}...`)
+  
+  const provider = await getProvider(chainName)
   const client = createClient(provider)
   
   // Get the typed API - in real apps, you'd import different descriptors per chain
-  const typedApi = client.getTypedApi(paseo)
+  const typedApi = client.getTypedApi(paseoah)
   
   // Expose to browser devtools in development for easy debugging
   if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
@@ -96,6 +96,7 @@ export function createChainClient(chainName: SupportedChain = DEFAULT_CHAIN) {
     console.log('🔧 PAPI client exposed at window.__PAPI_CLIENT__ and window.__PAPI_API__')
   }
   
+  console.log(`✅ Chain client created for ${chainName}`)
   return { client, typedApi }
 }
 
@@ -103,8 +104,10 @@ export function createChainClient(chainName: SupportedChain = DEFAULT_CHAIN) {
 export const chainClient$ = state(
   selectedChain$.pipe(
     switchMap((chainName) => {
-      const { client, typedApi } = createChainClient(chainName)
-      return from([{ client, typedApi, chainName }])
+      console.log(`🔄 Switching to chain: ${chainName}`)
+      return from(createChainClient(chainName)).pipe(
+        map(({ client, typedApi }) => ({ client, typedApi, chainName }))
+      )
     })
   ),
   null

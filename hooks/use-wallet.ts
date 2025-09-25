@@ -6,6 +6,7 @@ interface WalletContextType {
   isConnected: boolean
   allAccounts: InjectedPolkadotAccount[]
   setSelectedAccount: (account: InjectedPolkadotAccount | null) => void
+  disconnect: () => Promise<void>
 }
 
 export const WalletContext = createContext<WalletContextType | null>(null)
@@ -17,41 +18,9 @@ export function useWallet() {
     const [selectedAccount, setSelectedAccount] = useState<InjectedPolkadotAccount | null>(null)
     const [polkadotJSAccounts, setPolkadotJSAccounts] = useState<InjectedPolkadotAccount[]>([])
     const [walletConnectAccounts, setWalletConnectAccounts] = useState<InjectedPolkadotAccount[]>([])
+    const [isDisconnecting, setIsDisconnecting] = useState(false)
 
-    // Load Polkadot JS accounts
-    useEffect(() => {
-      const loadPolkadotJSAccounts = async () => {
-        if (typeof window === 'undefined') return
-        
-        try {
-          const injectedWeb3 = (window as any).injectedWeb3
-          if (!injectedWeb3?.['polkadot-js']) return
-
-          const { web3Accounts, web3Enable } = await import('@polkadot/extension-dapp')
-          
-          const extensions = await web3Enable('PolkaVM Bridge')
-          if (extensions.length === 0) return
-
-          const accounts = await web3Accounts()
-          
-          const polkadotAccounts = accounts.map((account: any) => ({
-            address: account.address,
-            name: account.meta.name || 'Polkadot Account',
-            polkadotSigner: null as any,
-            genesisHash: account.meta.genesisHash,
-            type: account.type as any
-          }))
-          
-          setPolkadotJSAccounts(polkadotAccounts)
-        } catch (error) {
-          console.error('Failed to load Polkadot JS accounts:', error)
-        }
-      }
-
-      loadPolkadotJSAccounts()
-    }, [])
-
-    // Subscribe to WalletConnect accounts manually
+    // Subscribe to WalletConnect accounts for existing sessions only
     useEffect(() => {
       let subscription: any
       
@@ -60,6 +29,10 @@ export function useWallet() {
           const { wcAccounts$ } = await import('@/features/wallet-connect/accounts.state')
           subscription = wcAccounts$.subscribe((accounts) => {
             setWalletConnectAccounts(accounts)
+            // Auto-select first WalletConnect account if no account selected
+            if (!selectedAccount && accounts.length > 0) {
+              setSelectedAccount(accounts[0])
+            }
           })
         } catch (error) {
           console.error('Failed to subscribe to WalletConnect accounts:', error)
@@ -73,16 +46,41 @@ export function useWallet() {
           subscription.unsubscribe()
         }
       }
-    }, [])
+    }, [selectedAccount])
 
     const allAccounts = [...polkadotJSAccounts, ...walletConnectAccounts]
     const isConnected = selectedAccount !== null
+
+    const disconnect = async () => {
+      setIsDisconnecting(true)
+      
+      try {
+        // Clear local selected account
+        setSelectedAccount(null)
+        
+        // Clear all local accounts state
+        setPolkadotJSAccounts([])
+        setWalletConnectAccounts([])
+        
+        // Disconnect from WalletConnect if connected
+        try {
+          const { walletConnect } = await import('@/features/wallet-connect')
+          await walletConnect.disconnect()
+          console.log('WalletConnect disconnected successfully')
+        } catch (error) {
+          console.log('No active WalletConnect session to disconnect:', error)
+        }
+      } finally {
+        setIsDisconnecting(false)
+      }
+    }
 
     return {
       selectedAccount,
       isConnected,
       allAccounts,
-      setSelectedAccount
+      setSelectedAccount,
+      disconnect
     }
   }
   return context

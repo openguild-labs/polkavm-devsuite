@@ -99,6 +99,8 @@ export interface InjectedPolkadotAccount {
 	genesisHash?: string | null;
 	name?: string;
 	type?: KeypairType;
+	walletId?: string;
+	walletName?: string;
 }
 
 export type SignPayload = (

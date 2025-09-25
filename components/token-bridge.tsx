@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -16,6 +16,8 @@ import {
 } from "@/lib/chains"
 import { ConnectButton } from "./connect-button"
 import { useWallet } from "@/hooks/use-wallet"
+import { chainClient$ } from "@/lib/chain"
+import { useStateObservable } from "@react-rxjs/core"
 
 // Color mapping for network icons
 const networkColors: Record<string, string> = {
@@ -44,18 +46,95 @@ const toNetworks = Object.entries(supportedPolkaVMChains).map(([key, config]) =>
 }))
 
 const tokens = [
-  { symbol: "PAS", name: "Paseo Token", balance: "2.4567", price: "$" },
-
+  { symbol: "PAS", name: "Paseo Token", price: "$" },
 ]
 
 export function TokenBridge() {
-  const { isConnected } = useWallet()
+  const { isConnected, selectedAccount, disconnect } = useWallet()
+  const chainClient = useStateObservable(chainClient$)
   const [fromNetwork, setFromNetwork] = useState(fromNetworks[0]) // First supported chain
   const [toNetwork, setToNetwork] = useState(toNetworks[0]) // First supported PolkaVM chain
   const [selectedToken, setSelectedToken] = useState(tokens[0])
   const [amount, setAmount] = useState("")
   const [recipientAddress, setRecipientAddress] = useState("")
   const [addressCopied, setAddressCopied] = useState(false)
+  const [accountBalance, setAccountBalance] = useState<string>("0.0000")
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false)
+
+  // Format balance from planck to human readable
+  const formatBalance = (balance: bigint, decimals: number = 10): string => {
+    const divisor = BigInt(10 ** decimals)
+    const whole = balance / divisor
+    const remainder = balance % divisor
+    const fractional = Number(remainder) / Number(divisor)
+    return `${whole}.${fractional.toFixed(4).slice(2)}`
+  }
+
+  // Fetch account balance
+  const fetchAccountBalance = async () => {
+    console.log('🔍 fetchAccountBalance called with:', {
+      selectedAccount: selectedAccount?.address,
+      chainClient: !!chainClient,
+      typedApi: !!chainClient?.typedApi,
+      fromNetwork: fromNetwork.id
+    })
+
+    if (!selectedAccount?.address) {
+      console.log('❌ No selected account address')
+      setAccountBalance("0.0000")
+      return
+    }
+
+    if (!chainClient?.typedApi) {
+      console.log('❌ No chain client or typed API available')
+      setAccountBalance("0.0000")
+      return
+    }
+
+    setIsLoadingBalance(true)
+    try {
+      console.log(`🔍 Fetching balance for ${selectedAccount.address} on chain ${fromNetwork.id}...`)
+      
+      // Check if the address is valid
+      if (!selectedAccount.address.startsWith('5') || selectedAccount.address.length !== 48) {
+        console.error('❌ Invalid address format:', selectedAccount.address)
+        setAccountBalance("0.0000")
+        return
+      }
+
+      const account = await chainClient.typedApi.query.System.Account.getValue(selectedAccount.address)
+      console.log('📊 Raw account data:', account)
+      
+      const balance = account.data.free
+      console.log('💰 Raw balance (planck):', balance.toString())
+      
+      const decimals = fromNetwork.id === 'paseoah' ? 10 : 10
+      const formattedBalance = formatBalance(balance, decimals)
+      
+      setAccountBalance(formattedBalance)
+      console.log(`✅ Balance for ${selectedAccount.address}: ${formattedBalance} ${selectedToken.symbol}`)
+    } catch (error) {
+      console.error('❌ Failed to fetch balance:', error)
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      })
+      setAccountBalance("0.0000")
+    } finally {
+      setIsLoadingBalance(false)
+    }
+  }
+
+  // Fetch balance when account or chain changes
+  useEffect(() => {
+    console.log('🔄 useEffect triggered for balance fetch:', {
+      selectedAccountAddress: selectedAccount?.address,
+      hasChainClient: !!chainClient,
+      hasTypedApi: !!chainClient?.typedApi,
+      fromNetworkId: fromNetwork.id
+    })
+    fetchAccountBalance()
+  }, [selectedAccount?.address, chainClient?.typedApi, fromNetwork.id])
 
   const swapNetworks = () => {
     // Since from and to networks are different types, we'll cycle through available options
@@ -163,16 +242,30 @@ export function TokenBridge() {
                 variant="ghost"
                 size="sm"
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80"
-                onClick={() => setAmount(selectedToken.balance)}
+                onClick={() => setAmount(accountBalance)}
+                disabled={isLoadingBalance || accountBalance === "0.0000"}
               >
                 MAX
               </Button>
             </div>
 
             <div className="flex justify-between text-sm text-muted-foreground">
-              <span>
-                Balance: {selectedToken.balance} {selectedToken.symbol}
-              </span>
+              <div className="flex items-center gap-2">
+                <span>
+                  Balance: {isLoadingBalance ? "Loading..." : `${accountBalance} ${selectedToken.symbol}`}
+                </span>
+                {selectedAccount?.address && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={fetchAccountBalance}
+                    disabled={isLoadingBalance}
+                    className="h-6 px-2 text-xs"
+                  >
+                    🔄
+                  </Button>
+                )}
+              </div>
               <span>{selectedToken.price}</span>
             </div>
           </div>
