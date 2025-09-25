@@ -6,8 +6,6 @@ import { withPolkadotSdkCompat } from "polkadot-api/polkadot-sdk-compat"
 import { getSmProvider } from "polkadot-api/sm-provider"
 import { startFromWorker } from "polkadot-api/smoldot/from-worker"
 
-// @ts-ignore-next-line
-import SmWorker from "polkadot-api/smoldot/worker?worker"
 
 import { getWsProvider } from "polkadot-api/ws-provider"
 import { map, take, switchMap, startWith, BehaviorSubject, from } from "rxjs"
@@ -18,17 +16,32 @@ export const DEFAULT_CHAIN: SupportedChain = "paseo" as SupportedChain
 // Reactive selected chain
 export const selectedChain$ = new BehaviorSubject<SupportedChain>(DEFAULT_CHAIN)
 
-// Initialize Smoldot worker for light client connections
-export const smoldot = startFromWorker(new SmWorker())
+// Initialize Smoldot worker for light client connections (client-side only)
+let smoldot: any = null
+
+async function getSmoldot() {
+  if (typeof window === 'undefined') {
+    throw new Error('Smoldot can only be used on client-side')
+  }
+  
+  if (!smoldot) {
+    // @ts-ignore-next-line
+    const SmWorker = (await import("polkadot-api/smoldot/worker?worker")).default
+    const worker = new SmWorker()
+    smoldot = startFromWorker(worker)
+  }
+  
+  return smoldot
+}
 
 // Chain instances cache
 const chainInstances = new Map<SupportedChain, Promise<any>>()
 
-function createChainInstance(chainName: SupportedChain) {
+async function createChainInstance(chainName: SupportedChain) {
   const config = supportedChains[chainName]
-  return config.chainSpec().then(({ chainSpec }) =>
-    smoldot.addChain({ chainSpec })
-  )
+  const { chainSpec } = await config.chainSpec()
+  const smoldotInstance = await getSmoldot()
+  return smoldotInstance.addChain({ chainSpec })
 }
 
 function getChainInstance(chainName: SupportedChain) {
@@ -38,9 +51,11 @@ function getChainInstance(chainName: SupportedChain) {
   return chainInstances.get(chainName)!
 }
 
-// Provider selection logic
-export const useLightClient =
-  new URLSearchParams(location.search).get("smoldot") === "true"
+// Provider selection logic (client-side only)
+function isLightClientMode(): boolean {
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get("smoldot") === "true"
+}
 
 // Simple provider creation with multiple endpoints
 function createProvider(urls: string[]) {
@@ -55,10 +70,8 @@ function createProvider(urls: string[]) {
 function getProvider(chainName: SupportedChain) {
   const config = supportedChains[chainName]
   
-  
-
   // Use light client (Smoldot) if requested
-  if (useLightClient) {
+  if (isLightClientMode()) {
     return getSmProvider(getChainInstance(chainName))
   }
 

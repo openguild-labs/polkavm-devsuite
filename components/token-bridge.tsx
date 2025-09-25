@@ -8,17 +8,14 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowUpDown, Wallet, ChevronDown, Zap, Clock, Copy, Check } from "lucide-react"
 
 const networks = [
-  { id: "substrate", name: "Substrate", symbol: "SUB", color: "bg-pink-500" },
-  { id: "balance", name: "Balance EVM", symbol: "BAL", color: "bg-green-500" },
-  { id: "ethereum", name: "Ethereum", symbol: "ETH", color: "bg-blue-500" },
-  { id: "polygon", name: "Polygon", symbol: "MATIC", color: "bg-purple-500" },
+  { id: "paseoah", name: "Paseo Asset Hub", symbol: "PAS", color: "bg-pink-500" },
+  { id: "paseoah", name: "Paseo Asset Hub", symbol: "PAS", color: "bg-green-500" },
+
 ]
 
 const tokens = [
-  { symbol: "SUB", name: "Substrate Token", balance: "2.4567", price: "$3,245.67" },
-  { symbol: "USDC", name: "USD Coin", balance: "1,250.00", price: "$1.00" },
-  { symbol: "USDT", name: "Tether", balance: "890.45", price: "$1.00" },
-  { symbol: "WBTC", name: "Wrapped Bitcoin", balance: "0.1234", price: "$67,890.12" },
+  { symbol: "PAS", name: "Paseo Token", balance: "2.4567", price: "$3,245.67" },
+
 ]
 
 export function TokenBridge() {
@@ -56,7 +53,7 @@ export function TokenBridge() {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Zap className="w-5 h-5 text-primary-foreground" />
             </div>
-            <h1 className="text-xl font-bold text-balance">TokenBridge</h1>
+            <h1 className="text-xl font-bold text-balance">PolkaVM Bridge</h1>
           </div>
 
           <div className="flex items-center gap-4">
@@ -76,7 +73,7 @@ export function TokenBridge() {
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold mb-3 text-balance">Bridge Your Tokens</h2>
           <p className="text-muted-foreground text-pretty">
-            Convert Substrate native tokens to Balance EVM-compatible tokens seamlessly
+            Convert native tokens to Balance PolkaVM Asset Hub tokens seamlessly 
           </p>
         </div>
 
@@ -165,7 +162,7 @@ export function TokenBridge() {
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">To</label>
               <Badge variant="outline" className="text-xs">
-                EVM Compatible
+                PolkaVM Asset Hub 
               </Badge>
             </div>
 
