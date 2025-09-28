@@ -112,6 +112,8 @@ export function TokenBridge() {
   const [isLoadingBalance, setIsLoadingBalance] = useState(false)
   const [isBridging, setIsBridging] = useState(false)
   const [bridgeError, setBridgeError] = useState<string | null>(null)
+  const [evmBalance, setEvmBalance] = useState<string | null>(null)
+  const [isLoadingEvmBalance, setIsLoadingEvmBalance] = useState(false)
 
   // Format balance from planck to human readable
   const formatBalance = (balance: bigint, decimals: number = 10): string => {
@@ -258,6 +260,60 @@ export function TokenBridge() {
   const isValidEvmAddress = (address: string) => {
     return /^0x[a-fA-F0-9]{40}$/.test(address)
   }
+
+  // Fetch EVM balance for the recipient address
+  const fetchEvmBalance = async (address: string) => {
+    if (!toNetwork) return
+    setIsLoadingEvmBalance(true)
+    setEvmBalance(null)
+    try {
+      const networkConfig = getPolkaVMChainConfig(toNetwork.id)
+      if (!networkConfig || !networkConfig.rpcUrl) {
+        throw new Error(`No RPC URL configured for ${toNetwork.name}`)
+      }
+      
+      const response = await fetch(networkConfig.rpcUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_getBalance',
+          params: [address, 'latest'],
+          id: 1,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      if (data.error) {
+        throw new Error(data.error.message)
+      }
+      
+      const balanceInWei = BigInt(data.result)
+      const decimals = networkConfig.decimals || 18
+      const formattedBalance = formatBalance(balanceInWei, decimals)
+      setEvmBalance(formattedBalance)
+    } catch (error) {
+      console.error('Failed to fetch EVM balance:', error)
+      setEvmBalance(null)
+    } finally {
+      setIsLoadingEvmBalance(false)
+    }
+  }
+
+  // Effect to fetch EVM balance when recipient address changes
+  useEffect(() => {
+    if (isValidEvmAddress(recipientAddress)) {
+      fetchEvmBalance(recipientAddress)
+    } else {
+      setEvmBalance(null)
+    }
+  }, [recipientAddress, toNetwork.id])
 
   // Convert amount to planck (native chain units)
   const amountToPlanck = (amount: string, decimals: number = 10): bigint => {
@@ -814,6 +870,18 @@ export function TokenBridge() {
 
             {recipientAddress && !isValidEvmAddress(recipientAddress) && (
               <p className="text-sm text-red-500">Please enter a valid EVM address (0x...)</p>
+            )}
+
+            {/* EVM Balance Display */}
+            {(isLoadingEvmBalance || evmBalance !== null) && (
+              <div className="text-sm text-muted-foreground flex items-center gap-2">
+                <span>Balance on {toNetwork.name}:</span>
+                {isLoadingEvmBalance ? (
+                  <span>Loading...</span>
+                ) : (
+                  <span className="font-medium text-primary">{evmBalance} {toNetwork.symbol}</span>
+                )}
+              </div>
             )}
 
             <p className="text-xs text-muted-foreground">

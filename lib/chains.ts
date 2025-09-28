@@ -118,14 +118,14 @@ export const supportedPolkaVMChains = {
     name: "passet",
     displayName: "Passet PolkaVM Asset Hub",
     symbol: "PAS",
-    rpc: "https://testnet-passet-hub-eth-rpc.polkadot.io",
+    rpcUrl: "https://testnet-passet-hub-eth-rpc.polkadot.io",
     chainId: 420420422
   },
   wah: {
     name: "wah",
     displayName: "Westend PolkaVM Asset Hub",
     symbol: "WND",
-    rpc: "https://westend-asset-hub-eth-rpc.polkadot.io",
+    rpcUrl: "https://westend-asset-hub-eth-rpc.polkadot.io",
     chainId: 420420421
   }
 
