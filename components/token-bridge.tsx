@@ -352,14 +352,22 @@ export function TokenBridge() {
       }
 
       // Convert amount to planck units (native chain decimals)
-      const decimals = fromNetwork.id === 'wah' ? 12 : 10
+      const networkConfig = getChainConfig(fromNetwork.id)
+      const decimals = networkConfig.decimals
       const valueInPlanck = amountToPlanck(amount, decimals)
+
+      console.log(
+        `💰 Amount in: ${formatBalance(
+          valueInPlanck,
+          decimals,
+        )} ${networkConfig.symbol}`,
+      )
       
       console.log('💰 Amount conversion:', {
         input: amount,
         decimals: decimals,
         planck: valueInPlanck.toString(),
-        valueType: typeof valueInPlanck
+        valueType: typeof valueInPlanck,
       })
 
       // Validate conversion result
@@ -521,14 +529,23 @@ export function TokenBridge() {
 
       console.log('🎉 Bridge transaction completed successfully!')
 
+      const txHash = (result as any).txHash
+
+      console.log('🔗 Transaction hash:', txHash)
+
       toast.success(
         <div className="space-y-1">
           <div className="font-medium">Bridge successful! 🎉</div>
           <div className="text-sm text-muted-foreground">
             {amount} {fromNetwork.symbol} bridged to PolkaVM
           </div>
+          {txHash && (
+            <div className="text-sm text-muted-foreground font-mono">
+              TX: {txHash}
+            </div>
+          )}
         </div>,
-        { id: 'bridge-tx', duration: 5000 }
+        { id: 'bridge-tx', duration: 10000 },
       )
 
       // Clear form
