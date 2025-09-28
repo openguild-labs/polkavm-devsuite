@@ -28,10 +28,64 @@ import { useStateObservable } from "@react-rxjs/core"
 import { toast } from "sonner"
 import { Binary } from "polkadot-api"
 import { catchError, of, shareReplay } from "rxjs"
-
+import { ss58Address } from "@polkadot-labs/hdkd-helpers";
 
 import { getPolkadotSignerFromPjs } from "@/features/wallet-connect/pjs-signer/from-pjs-account"
 import type { SignPayload, SignRaw } from "@/features/wallet-connect/pjs-signer/types"
+import { ss58ToH160 } from "@/lib/utils"
+
+
+const SS58_PREFIX = 42;
+export function convertPublicKeyToSs58(publickey: Uint8Array) {
+  return ss58Address(publickey, SS58_PREFIX);
+}
+
+
+// Helper function to ensure account is mapped
+async function ensureAccountMapped(api: any, signer: any, senderAddress: string) {
+  const ss58Address = convertPublicKeyToSs58(signer.publicKey);
+  const mapped = await api.query.Revive.OriginalAccount.getValue(
+    ss58ToH160(ss58Address),
+  );
+
+  if (mapped) {
+    console.log(`Account already mapped to`);
+    return;
+  }
+
+  console.log('Mapping account...');
+  await mapAccount(api, signer);
+}
+
+
+// Helper function to map account
+async function mapAccount(api: any, signer: any) {
+  const tx = api.tx.Revive.map_account();
+  
+  const options = {
+    mortality: { mortal: true, period: 64 },
+  };
+  
+  const obsTxEvents = tx.signSubmitAndWatch(signer, options)
+    .pipe(
+      catchError((error) => of({ type: "error" as const, error })),
+      shareReplay(1),
+    );
+  
+  return new Promise((resolve, reject) => {
+    const subscription = obsTxEvents.subscribe((event) => {
+      console.log('📡 Mapping transaction event:', event);
+      
+      if (event.type === 'finalized') {
+        subscription.unsubscribe();
+        resolve(event);
+      } else if (event.type === 'error') {
+        subscription.unsubscribe();
+        reject(event.error);
+      }
+    });
+  });
+}
 
 // Helper function to get a compatible signer
 async function getCompatibleSigner(account: any, chainClient: any) {
@@ -446,6 +500,12 @@ export function TokenBridge() {
       const signer = await getCompatibleSigner(selectedAccount, chainClient)
       console.log('✅ Using compatible signer:', typeof signer)
 
+      // Ensure account is mapped before proceeding
+      console.log('🔍 Checking if account is mapped...')
+      toast.loading('Checking account mapping...', { id: 'bridge-tx' })
+      
+      await ensureAccountMapped(chainClient.typedApi, signer, selectedAccount.address)
+
       console.log('✍️ Signing transaction...')
       toast.loading('Please sign the transaction in your wallet...', { id: 'bridge-tx' })
       
@@ -642,7 +702,7 @@ export function TokenBridge() {
               <label className="text-sm font-medium">From</label>
               <Badge variant="outline" className="text-xs">
                 <Clock className="w-3 h-3 mr-1" />
-                ~2 min
+                ~6s 
               </Badge>
             </div>
 

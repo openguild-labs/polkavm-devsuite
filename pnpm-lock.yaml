@@ -32,6 +32,9 @@ importers:
       '@polkadot-api/utils':
         specifier: ^0.2.0
         version: 0.2.0
+      '@polkadot-labs/hdkd-helpers':
+        specifier: ^0.0.25
+        version: 0.0.25
       '@polkadot/extension-dapp':
         specifier: ^0.61.5
         version: 0.61.7(@polkadot/api@16.4.8)(@polkadot/util-crypto@13.5.6(@polkadot/util@13.5.6))(@polkadot/util@13.5.6)
@@ -587,6 +590,10 @@ packages:
     resolution: {integrity: sha512-gbKGcRUYIjA3/zCCNaWDciTMFI0dCkvou3TL8Zmy5Nc7sJ47a0jtOeZoTaMxkuqRo9cRhjOdZJXegxYE5FN/xw==, tarball: https://registry.npmjs.org/@noble/curves/-/curves-1.9.7.tgz}
     engines: {node: ^14.21.3 || >=16}
 
+  '@noble/curves@2.0.1':
+    resolution: {integrity: sha512-vs1Az2OOTBiP4q0pwjW5aF0xp9n4MxVrmkFBxc6EKZc6ddYx5gaZiAsZoq0uRRXWbi3AT/sBqn05eRPtn1JCPw==, tarball: https://registry.npmjs.org/@noble/curves/-/curves-2.0.1.tgz}
+    engines: {node: '>= 20.19.0'}
+
   '@noble/hashes@1.5.0':
     resolution: {integrity: sha512-1j6kQFb7QRru7eKN3ZDvRcP13rugwdxZqCjbiAVZfIJwgj2A65UmT4TgARXGlXgnRkORLTDTrO19ZErt7+QXgA==, tarball: https://registry.npmjs.org/@noble/hashes/-/hashes-1.5.0.tgz}
     engines: {node: ^14.21.3 || >=16}
@@ -733,6 +740,9 @@ packages:
 
   '@polkadot-api/ws-provider@0.6.0':
     resolution: {integrity: sha512-iWU+asTFyC/lMPjHmuToo9nmDh4S99L441jh8WPkV7swzV9l9aj3KylTg7sedGBiacw+wdospD+im3y/a31Cpg==, tarball: https://registry.npmjs.org/@polkadot-api/ws-provider/-/ws-provider-0.6.0.tgz}
+
+  '@polkadot-labs/hdkd-helpers@0.0.25':
+    resolution: {integrity: sha512-GwHayBuyHKfzvGD0vG47NbjFeiK6rRQHQAn1syut9nt0mhXMg4yb3tJ//IyM317qWuDU3HbD2OIp5jKDEQz2/A==, tarball: https://registry.npmjs.org/@polkadot-labs/hdkd-helpers/-/hdkd-helpers-0.0.25.tgz}
 
   '@polkadot/api-augment@16.4.8':
     resolution: {integrity: sha512-hBjSCkQjKqfUmhD1eNFg01Q1kivD5EGnq7zCaKFof+2Y1pdCs9EI5Qa+7MLJFJA0TvHBY6ILt5mSW6Gp/b0dtw==, tarball: https://registry.npmjs.org/@polkadot/api-augment/-/api-augment-16.4.8.tgz}
@@ -1690,6 +1700,10 @@ packages:
 
   '@scure/bip39@1.6.0':
     resolution: {integrity: sha512-+lF0BbLiJNwVlev4eKelw1WWLaiKXw7sSl8T6FvBlWkdX+94aGJ4o8XjUdlyhTCjd8c+B3KT3JfS8P0bLRNU6A==, tarball: https://registry.npmjs.org/@scure/bip39/-/bip39-1.6.0.tgz}
+
+  '@scure/sr25519@0.3.0':
+    resolution: {integrity: sha512-SKsinX2sImunfcsH3seGrwH/OayBwwaJqVN8J1cJBNRCfbBq5q0jyTKGa9PcW1HWv9vXT6Yuq41JsxFLvF59ew==, tarball: https://registry.npmjs.org/@scure/sr25519/-/sr25519-0.3.0.tgz}
+    engines: {node: '>= 20.19.0'}
 
   '@sec-ant/readable-stream@0.4.1':
     resolution: {integrity: sha512-831qok9r2t8AlxLko40y2ebgSDhenenCatLVeW/uBtnHPyhHOvG0C7TvfgecV+wHzIm5KUICgzmVpWS+IMEAeg==, tarball: https://registry.npmjs.org/@sec-ant/readable-stream/-/readable-stream-0.4.1.tgz}
@@ -3756,6 +3770,10 @@ snapshots:
     dependencies:
       '@noble/hashes': 1.8.0
 
+  '@noble/curves@2.0.1':
+    dependencies:
+      '@noble/hashes': 2.0.1
+
   '@noble/hashes@1.5.0': {}
 
   '@noble/hashes@1.7.0': {}
@@ -4003,6 +4021,14 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  '@polkadot-labs/hdkd-helpers@0.0.25':
+    dependencies:
+      '@noble/curves': 2.0.1
+      '@noble/hashes': 2.0.1
+      '@scure/base': 2.0.0
+      '@scure/sr25519': 0.3.0
+      scale-ts: 1.6.1
 
   '@polkadot/api-augment@16.4.8':
     dependencies:
@@ -5098,6 +5124,11 @@ snapshots:
     dependencies:
       '@noble/hashes': 1.8.0
       '@scure/base': 1.2.6
+
+  '@scure/sr25519@0.3.0':
+    dependencies:
+      '@noble/curves': 2.0.1
+      '@noble/hashes': 2.0.1
 
   '@sec-ant/readable-stream@0.4.1': {}
 
