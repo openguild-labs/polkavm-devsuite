@@ -1,4 +1,4 @@
-import { paseoah, wah } from "@polkadot-api/descriptors"
+import { wah, passet_hub } from "@polkadot-api/descriptors"
 import { state } from "@react-rxjs/core"
 import { createClient } from "polkadot-api"
 import { withLogsRecorder } from "polkadot-api/logs-provider"
@@ -9,9 +9,9 @@ import { startFromWorker } from "polkadot-api/smoldot/from-worker"
 
 import { getWsProvider } from "polkadot-api/ws-provider"
 import { map, take, switchMap, startWith, BehaviorSubject, from } from "rxjs"
-import { supportedChains, shuffleArray, type SupportedChain } from "./chains"
+import { supportedChains, shuffleArray, type SupportedChain, type ChainConfig } from "./chains"
 
-export const DEFAULT_CHAIN: SupportedChain = "paseoah" as SupportedChain
+export const DEFAULT_CHAIN: SupportedChain = "wah" as SupportedChain
 
 // Reactive selected chain
 export const selectedChain$ = new BehaviorSubject<SupportedChain>(DEFAULT_CHAIN)
@@ -37,8 +37,19 @@ async function getSmoldot() {
 // Chain instances cache
 const chainInstances = new Map<SupportedChain, Promise<any>>()
 
+// Type guard to check if chain has chainSpec
+function hasChainSpec(config: any): config is ChainConfig & { chainSpec: () => Promise<{ chainSpec: any }> } {
+  return config.chainSpec !== undefined
+}
+
 async function createChainInstance(chainName: SupportedChain) {
   const config = supportedChains[chainName]
+  
+  // Check if chain has chainSpec (required for light client)
+  if (!hasChainSpec(config)) {
+    throw new Error(`Chain ${chainName} does not support light client mode (no chainSpec)`)
+  }
+  
   const { chainSpec } = await config.chainSpec()
   const smoldotInstance = await getSmoldot()
   return smoldotInstance.addChain({ chainSpec })
@@ -70,8 +81,8 @@ function createProvider(urls: string[]) {
 function getProvider(chainName: SupportedChain) {
   const config = supportedChains[chainName]
   
-  // Use light client (Smoldot) if requested
-  if (isLightClientMode()) {
+  // Use light client (Smoldot) if requested AND chain supports it
+  if (isLightClientMode() && hasChainSpec(config)) {
     return getSmProvider(getChainInstance(chainName))
   }
 
@@ -80,14 +91,27 @@ function getProvider(chainName: SupportedChain) {
 }
 
 // Create PAPI client for specific chain
+// Get the correct descriptor for each chain
+function getChainDescriptor(chainName: SupportedChain) {
+  switch (chainName) {
+    case 'passet':
+      return passet_hub
+    case 'wah':
+      return wah
+    default:
+      return wah // fallback
+  }
+}
+
 export async function createChainClient(chainName: SupportedChain = DEFAULT_CHAIN) {
   console.log(`🔧 Creating chain client for ${chainName}...`)
   
   const provider = await getProvider(chainName)
   const client = createClient(provider)
   
-  // Get the typed API - in real apps, you'd import different descriptors per chain
-  const typedApi = client.getTypedApi(wah)
+  // Get the typed API with correct descriptor for the chain
+  const descriptor = getChainDescriptor(chainName)
+  const typedApi = client.getTypedApi(descriptor)
   
   // Expose to browser devtools in development for easy debugging
   if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {

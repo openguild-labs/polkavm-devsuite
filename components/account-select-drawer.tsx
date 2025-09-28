@@ -12,9 +12,10 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer"
 import { Wallet, Copy, Check } from "lucide-react"
-import type { InjectedPolkadotAccount } from "@/features/wallet-connect/pjs-signer/types"
+import type { InjectedPolkadotAccount, SignPayload, SignRaw } from "@/features/wallet-connect/pjs-signer/types"
 import { detectPolkadotWallets, externalWallets, type WalletInfo } from "@/lib/wallet-detection"
-import { chainClient$ } from "@/lib/chain"
+import { chainClient$, selectedChain$ } from "@/lib/chain"
+import { supportedChains, type SupportedChain } from "@/lib/chains"
 import { useStateObservable } from "@react-rxjs/core"
 import { toast } from "sonner"
 
@@ -45,6 +46,13 @@ export function AccountSelectDrawer({
   
   // Get chain client and API
   const chainClient = useStateObservable(chainClient$)
+  const [selectedChain, setSelectedChain] = useState<SupportedChain>("wah")
+  
+  // Subscribe to selected chain changes
+  useEffect(() => {
+    const subscription = selectedChain$.subscribe(setSelectedChain)
+    return () => subscription.unsubscribe()
+  }, [])
 
   // Function to fetch balance for a specific address
   const fetchBalance = async (address: string) => {
@@ -76,13 +84,19 @@ export function AccountSelectDrawer({
 
   // Function to format balance for display
   const formatBalance = (balance: bigint): string => {
-    // Convert from smallest unit (planck) to DOT (divide by 10^10 for Polkadot)
-    // For Paseo testnet, it's also 10^10
-    const divisor = 10n ** 10n
+    // Get the current network configuration
+    const networkConfig = supportedChains[selectedChain]
+    if (!networkConfig) {
+      console.warn('No network configuration found for selected chain:', selectedChain)
+      return `${Number(balance) / 1e10} DOT`
+    }
+    
+    // Convert from smallest unit (planck) to native token using correct decimals
+    const divisor = 10n ** BigInt(networkConfig.decimals)
     const formatted = Number(balance) / Number(divisor)
     
-    // Format to 4 decimal places and add unit
-    return `${formatted.toFixed(4)} DOT`
+    // Format to 4 decimal places and add correct symbol
+    return `${formatted.toFixed(4)} ${networkConfig.symbol}`
   }
 
   // Detect available wallets when drawer opens
@@ -122,6 +136,19 @@ export function AccountSelectDrawer({
     })
   }, [polkadotJSAccounts, walletConnectAccounts, chainClient, accountBalances, loadingBalances])
 
+  // Refetch balances when network changes
+  useEffect(() => {
+    if (!chainClient?.typedApi) return
+    
+    const allAccounts = [...polkadotJSAccounts, ...walletConnectAccounts]
+    
+    // Clear existing balances and refetch with new network
+    setAccountBalances(new Map())
+    allAccounts.forEach(account => {
+      fetchBalance(account.address)
+    })
+  }, [selectedChain])
+
   // Load Polkadot JS accounts only when drawer opens
   useEffect(() => {
     const loadPolkadotJSAccounts = async () => {
@@ -149,28 +176,41 @@ export function AccountSelectDrawer({
         
          // Convert to InjectedPolkadotAccount format with proper signers
          const { web3FromSource } = await import('@polkadot/extension-dapp')
+         const { getPolkadotSignerFromPjs } = await import('@/features/wallet-connect/pjs-signer/from-pjs-account')
          
-         const polkadotAccounts = await Promise.all(accounts.map(async (account: any) => {
-           // Get signer for each account
-           let signer = null
+         const polkadotAccounts = (await Promise.all(accounts.map(async (account: any) => {
+           // Get signer for each account and convert to polkadot-api compatible format
+           let polkadotApiSigner = null
            try {
              const injector = await web3FromSource(account.meta.source)
-             signer = injector.signer
-             console.log(`✅ Resolved signer for account ${account.address} from ${account.meta.source}`)
+             
+             if (injector?.signer && injector.signer.signPayload && injector.signer.signRaw) {
+
+               polkadotApiSigner = getPolkadotSignerFromPjs(
+                 account.address,
+                 injector.signer.signPayload.bind(injector.signer) as SignPayload,
+                 injector.signer.signRaw.bind(injector.signer) as SignRaw
+               )
+               console.log(`✅ Converted PJS signer to polkadot-api format for account ${account.address} from ${account.meta.source}`)
+             } else {
+               console.error(`❌ No valid signer found for account ${account.address} from ${account.meta.source}`)
+               return null // Skip this account
+             }
            } catch (error) {
-             console.error(`❌ Failed to get signer for account ${account.address}:`, error)
+             console.error(`❌ Failed to get and convert signer for account ${account.address}:`, error)
+             return null // Skip this account
            }
            
            return {
              address: account.address,
-             name: account.meta.name || 'Polkadot Account',
-             polkadotSigner: signer as any, // Cast to PolkadotSigner type
+             name: account.meta.name,
+             polkadotSigner: polkadotApiSigner, // Now this is a proper polkadot-api compatible signer
              genesisHash: account.meta.genesisHash,
              type: account.type as any,
              walletId: account.meta.source,
              walletName: account.meta.source === 'polkadot-js' ? 'Polkadot{.js}' : account.meta.source
-           }
-         }))
+           } as InjectedPolkadotAccount
+         }))).filter(account => account !== null) as InjectedPolkadotAccount[]
         
         setPolkadotJSAccounts(polkadotAccounts)
       } catch (error) {
@@ -235,7 +275,6 @@ export function AccountSelectDrawer({
 
       console.log(`Found ${wallet.displayName} extension:`, walletExtension)
 
-      // Enable ONLY this specific wallet (KheopSwap approach)
       console.log(`Enabling only ${wallet.displayName}...`)
       await walletExtension.enable('PolkaVM Bridge')
       console.log(`Successfully enabled ${wallet.displayName}`)

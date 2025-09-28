@@ -1,4 +1,4 @@
-// Wallet detection utilities - KheopSwap inspired approach
+
 export interface WalletInfo {
   id: string
   name: string

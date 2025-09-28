@@ -7,6 +7,13 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ArrowUpDown, Wallet, ChevronDown, Zap, Clock, Copy, Check } from "lucide-react"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
   supportedChains,
   supportedPolkaVMChains,
   type SupportedChain,
@@ -20,6 +27,37 @@ import { chainClient$, switchToChain } from "@/lib/chain"
 import { useStateObservable } from "@react-rxjs/core"
 import { toast } from "sonner"
 import { Binary } from "polkadot-api"
+import { catchError, of, shareReplay } from "rxjs"
+
+
+import { getPolkadotSignerFromPjs } from "@/features/wallet-connect/pjs-signer/from-pjs-account"
+import type { SignPayload, SignRaw } from "@/features/wallet-connect/pjs-signer/types"
+
+// Helper function to get a compatible signer
+async function getCompatibleSigner(account: any, chainClient: any) {
+  console.log('🔍 Getting signer for account:', account.address)
+  
+  // The account should already have a properly converted polkadot-api compatible signer
+  if (account.polkadotSigner) {
+    console.log('✅ Using account polkadotSigner (already converted to polkadot-api format)')
+    return account.polkadotSigner
+  }
+
+  // Fallback: Try to create a signer using the chain client
+  if (chainClient?.client && typeof chainClient.client.getPolkadotSigner === 'function') {
+    console.log('🔄 Trying chain client getPolkadotSigner as fallback...')
+    try {
+      const signer = chainClient.client.getPolkadotSigner(account.address)
+      console.log('✅ Chain client signer created successfully')
+      return signer
+    } catch (error) {
+      console.log('❌ Chain client signer failed:', error)
+    }
+  }
+
+  // If no signer is available, throw an error
+  throw new Error('No compatible signer found. Please reconnect your wallet.')
+}
 
 // Color mapping for network icons
 const networkColors: Record<string, string> = {
@@ -28,7 +66,9 @@ const networkColors: Record<string, string> = {
   westend: "bg-blue-500",
   paseo: "bg-purple-500",
   paseoah: "bg-orange-500",
-  paseoAssetHub: "bg-red-500"
+  paseoAssetHub: "bg-red-500",
+  passet: "bg-purple-600",
+  wah: "bg-blue-600"
 }
 
 // Convert supportedChains to format expected by UI
@@ -47,16 +87,24 @@ const toNetworks = Object.entries(supportedPolkaVMChains).map(([key, config]) =>
   color: networkColors[key] || "bg-blue-500"
 }))
 
-const tokens = [
-  { symbol: "WND", name: "Westend Token", price: "$" },
-]
+// Token mapping based on network
+const getTokensForNetwork = (networkId: string) => {
+  switch (networkId) {
+    case 'passet':
+      return [{ symbol: "PAS", name: "Paseo Token", price: "$" }]
+    case 'wah':
+      return [{ symbol: "WND", name: "Westend Token", price: "$" }]
+    default:
+      return [{ symbol: "WND", name: "Westend Token", price: "$" }]
+  }
+}
 
 export function TokenBridge() {
   const { isConnected, selectedAccount, disconnect } = useWallet()
   const chainClient = useStateObservable(chainClient$)
   const [fromNetwork, setFromNetwork] = useState(fromNetworks[0]) // First supported chain
   const [toNetwork, setToNetwork] = useState(toNetworks[0]) // First supported PolkaVM chain
-  const [selectedToken, setSelectedToken] = useState(tokens[0])
+  const [selectedToken, setSelectedToken] = useState(getTokensForNetwork(fromNetworks[0].id)[0])
   const [amount, setAmount] = useState("")
   const [recipientAddress, setRecipientAddress] = useState("")
   const [addressCopied, setAddressCopied] = useState(false)
@@ -130,11 +178,13 @@ export function TokenBridge() {
       const balance = account.data.free
       console.log('💰 Raw balance (planck):', balance.toString())
 
-      const decimals = fromNetwork.id === 'wah' ? 10 : 10
+      // Get the correct decimals from the network configuration
+      const networkConfig = supportedChains[fromNetwork.id]
+      const decimals = networkConfig.decimals
       const formattedBalance = formatBalance(balance, decimals)
 
       setAccountBalance(formattedBalance)
-      console.log(`✅ Balance for ${selectedAccount.address}: ${formattedBalance} ${selectedToken.symbol}`)
+      console.log(`✅ Balance for ${selectedAccount.address}: ${formattedBalance} ${networkConfig.symbol}`)
     } catch (error) {
       console.error('❌ Failed to fetch balance:', error)
       console.error('Error details:', {
@@ -169,6 +219,12 @@ export function TokenBridge() {
     fetchAccountBalance()
   }, [selectedAccount?.address, chainClient?.typedApi, fromNetwork.id])
 
+  // Update selected token when from network changes
+  useEffect(() => {
+    const availableTokens = getTokensForNetwork(fromNetwork.id)
+    setSelectedToken(availableTokens[0])
+  }, [fromNetwork.id])
+
   const swapNetworks = () => {
     // Since from and to networks are different types, we'll cycle through available options
     const currentFromIndex = fromNetworks.findIndex(n => n.id === fromNetwork.id)
@@ -180,6 +236,15 @@ export function TokenBridge() {
 
     setFromNetwork(fromNetworks[nextFromIndex])
     setToNetwork(toNetworks[nextToIndex])
+  }
+
+  // Network selection handlers
+  const handleFromNetworkSelect = (network: typeof fromNetworks[0]) => {
+    setFromNetwork(network)
+  }
+
+  const handleToNetworkSelect = (network: typeof toNetworks[0]) => {
+    setToNetwork(network)
   }
 
   const copyAddress = async () => {
@@ -267,8 +332,21 @@ export function TokenBridge() {
         hasSelectedAccount: !!selectedAccount,
         hasPolkadotSigner: !!selectedAccount?.polkadotSigner,
         signerType: typeof selectedAccount?.polkadotSigner,
-        signerKeys: selectedAccount?.polkadotSigner ? Object.keys(selectedAccount.polkadotSigner) : 'N/A'
+        signerKeys: selectedAccount?.polkadotSigner ? Object.keys(selectedAccount.polkadotSigner) : 'N/A',
+        signerPrototype: selectedAccount?.polkadotSigner ? Object.getPrototypeOf(selectedAccount.polkadotSigner) : 'N/A',
+        signerConstructor: selectedAccount?.polkadotSigner?.constructor?.name || 'N/A'
       })
+
+      // Deep inspection of signer methods
+      if (selectedAccount?.polkadotSigner) {
+        const signer = selectedAccount.polkadotSigner as any
+        console.log('🔬 Signer method inspection:', {
+          hasSignPayload: typeof signer.signPayload === 'function',
+          hasSignRaw: typeof signer.signRaw === 'function',
+          signerMethods: Object.getOwnPropertyNames(signer),
+          prototypeMethos: Object.getOwnPropertyNames(Object.getPrototypeOf(signer) || {})
+        })
+      }
 
       if (!selectedAccount.polkadotSigner) {
         console.error('❌ No signer available for selected account:', selectedAccount)
@@ -282,6 +360,12 @@ export function TokenBridge() {
           
           if (freshSigner) {
             console.log('✅ Fresh signer obtained successfully')
+            console.log('🔍 Fresh signer inspection:', {
+              type: typeof freshSigner,
+              constructor: freshSigner.constructor?.name,
+              methods: Object.getOwnPropertyNames(freshSigner),
+              hasSignPayload: typeof freshSigner.signPayload === 'function'
+            })
             selectedAccount.polkadotSigner = freshSigner as any
           } else {
             throw new Error('Fresh signer is also null')
@@ -294,37 +378,87 @@ export function TokenBridge() {
 
       console.log('✅ Using signer for account:', selectedAccount.address, 'from wallet:', selectedAccount.walletName)
 
+      // Get the signer with proper compatibility checks
+      const signer = await getCompatibleSigner(selectedAccount, chainClient)
+      console.log('✅ Using compatible signer:', typeof signer)
+
       console.log('✍️ Signing transaction...')
       toast.loading('Please sign the transaction in your wallet...', { id: 'bridge-tx' })
-      console.log("Signer:", selectedAccount.polkadotSigner);
-      // Sign and submit the transaction
-      const result = await call.signAndSubmit(selectedAccount.polkadotSigner)
-
-      toast.loading('Transaction submitted, waiting for confirmation...', { id: 'bridge-tx' })
-
-      console.log('📤 Transaction submitted:', result)
-
-      // Wait for transaction to be included in block
-      await new Promise((resolve, reject) => {
-        result.subscribe({
-          next: (event: any) => {
-            console.log('📋 Transaction event:', event)
-            if (event.type === 'txBestBlocksState' && event.found) {
-              if (event.ok) {
-                console.log('✅ Transaction successful!')
-                resolve(event)
-              } else {
-                console.error('❌ Transaction failed:', event.error)
-                reject(new Error(event.error?.type || 'Transaction failed'))
-              }
+      
+      // Sign and submit transaction using the compatible signer
+      let result
+      try {
+        console.log('📝 Signing transaction with compatible signer...')
+        
+        const options = {
+          mortality: { mortal: true, period: 64 },
+        }
+        
+        const obsTxEvents = call.signSubmitAndWatch(signer, options)
+          .pipe(
+            catchError((error) => of({ type: "error" as const, error })),
+            shareReplay(1),
+          )
+        
+        result = await new Promise((resolve, reject) => {
+          const subscription = obsTxEvents.subscribe((event) => {
+            console.log('📡 Transaction event:', event)
+            
+            if (event.type === 'finalized') {
+              subscription.unsubscribe()
+              resolve(event)
+            } else if (event.type === 'error') {
+              subscription.unsubscribe()
+              reject(event.error)
             }
-          },
-          error: (error: any) => {
-            console.error('❌ Transaction error:', error)
-            reject(error)
+          })
+        })
+        
+        console.log('✅ Transaction successful:', result)
+      } catch (signError: any) {
+        console.error('❌ SignAndSubmit failed:', signError)
+        console.error('❌ Error details:', {
+          message: signError?.message,
+          stack: signError?.stack,
+          name: signError?.name,
+          cause: signError?.cause,
+          signerInfo: {
+            type: typeof signer,
+            constructor: signer?.constructor?.name,
+            hasSignPayload: typeof signer?.signPayload === 'function',
+            address: selectedAccount.address,
+            walletId: selectedAccount.walletId
           }
         })
-      })
+        
+        // Check if it's a signer compatibility issue
+        const isSignerError = signError?.message?.includes('signer') || 
+                             signError?.message?.includes('compatible') ||
+                             signError?.message?.includes('reconnect') ||
+                             signError?.message?.includes('length')
+        
+        if (isSignerError) {
+          toast.error(
+            <div className="space-y-2">
+              <div className="font-medium">Signer compatibility issue</div>
+              <div className="text-sm">Please try reconnecting your wallet or use a different account</div>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="text-sm underline hover:no-underline"
+              >
+                Reload page to reconnect
+              </button>
+            </div>, 
+            { id: 'bridge-tx', duration: 10000 }
+          )
+          throw new Error('Signer compatibility issue. Please try reconnecting your wallet or use a different account.')
+        } else {
+          toast.error(`Transaction failed: ${signError?.message || 'Unknown error'}`, { id: 'bridge-tx' })
+          throw signError
+        }
+      }
+
+      console.log('📤 Transaction completed:', result)
 
       // Refresh balance after successful transaction
       await fetchAccountBalance()
@@ -335,7 +469,7 @@ export function TokenBridge() {
         <div className="space-y-1">
           <div className="font-medium">Bridge successful! 🎉</div>
           <div className="text-sm text-muted-foreground">
-            {amount} {selectedToken.symbol} bridged to PolkaVM
+            {amount} {fromNetwork.symbol} bridged to PolkaVM
           </div>
         </div>,
         { id: 'bridge-tx', duration: 5000 }
@@ -400,7 +534,7 @@ export function TokenBridge() {
                 <div>Account Wallet: {selectedAccount?.walletName || 'None'}</div>
                 <div>Signer Available: {selectedAccount?.polkadotSigner ? '✅ Yes' : '❌ No'}</div>
                 <div>Chain Client: {chainClient ? `✅ ${chainClient.chainName}` : '❌ Not connected'}</div>
-                <div>Balance: {accountBalance} {selectedToken.symbol}</div>
+                <div>Balance: {accountBalance} {fromNetwork.symbol}</div>
                 <div>Is Loading: {isLoadingBalance ? 'Yes' : 'No'}</div>
                 <div>Is Bridging: {isBridging ? 'Yes' : 'No'}</div>
                 {bridgeError && <div className="text-red-600">Error: {bridgeError}</div>}
@@ -441,27 +575,46 @@ export function TokenBridge() {
 
             <div className="grid grid-cols-2 gap-4">
               <Card className="p-4 bg-secondary/50 border-border/50">
-                <div
-                  className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2"
-                  onClick={() => {
-                    const currentIndex = fromNetworks.findIndex(n => n.id === fromNetwork.id)
-                    const nextIndex = (currentIndex + 1) % fromNetworks.length
-                    const newNetwork = fromNetworks[nextIndex]
-                    console.log(`🔄 Switching from ${fromNetwork.name} to ${newNetwork.name}`)
-                    setFromNetwork(newNetwork)
-                  }}
-                >
-                  <div
-                    className={`w-8 h-8 ${fromNetwork.color} rounded-full flex items-center justify-center text-white text-sm font-bold`}
-                  >
-                    {fromNetwork.symbol[0]}
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium">{fromNetwork.name}</div>
-                    <div className="text-xs text-muted-foreground">{fromNetwork.symbol}</div>
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
+                      <div
+                        className={`w-8 h-8 ${fromNetwork.color} rounded-full flex items-center justify-center text-white text-sm font-bold`}
+                      >
+                        {fromNetwork.symbol[0]}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium">{fromNetwork.name}</div>
+                        <div className="text-xs text-muted-foreground">{fromNetwork.symbol}</div>
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-80">
+                    <ScrollArea className="h-64">
+                      {fromNetworks.map((network) => (
+                        <DropdownMenuItem
+                          key={network.id}
+                          onClick={() => handleFromNetworkSelect(network)}
+                          className="flex items-center gap-3 p-3 cursor-pointer"
+                        >
+                          <div
+                            className={`w-8 h-8 ${network.color} rounded-full flex items-center justify-center text-white text-sm font-bold`}
+                          >
+                            {network.symbol[0]}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium">{network.name}</div>
+                            <div className="text-xs text-muted-foreground">{network.symbol}</div>
+                          </div>
+                          {network.id === fromNetwork.id && (
+                            <Check className="w-4 h-4 text-primary" />
+                          )}
+                        </DropdownMenuItem>
+                      ))}
+                    </ScrollArea>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </Card>
 
               <Card className="p-4 bg-secondary/50 border-border/50">
@@ -500,7 +653,7 @@ export function TokenBridge() {
             <div className="flex justify-between text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
               <span>
-                  Balance: {isLoadingBalance ? "Loading..." : `${accountBalance} ${selectedToken.symbol}`}
+                  Balance: {isLoadingBalance ? "Loading..." : `${accountBalance} ${fromNetwork.symbol}`}
               </span>
                 {selectedAccount?.address && (
                   <div className="flex gap-1">
@@ -558,18 +711,46 @@ export function TokenBridge() {
 
             <div className="grid grid-cols-2 gap-4">
               <Card className="p-4 bg-secondary/50 border-border/50">
-                <div className="flex items-center gap-3 cursor-pointer">
-                  <div
-                    className={`w-8 h-8 ${toNetwork.color} rounded-full flex items-center justify-center text-white text-sm font-bold`}
-                  >
-                    {toNetwork.symbol[0]}
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium">{toNetwork.name}</div>
-                    <div className="text-xs text-muted-foreground">{toNetwork.symbol}</div>
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
+                      <div
+                        className={`w-8 h-8 ${toNetwork.color} rounded-full flex items-center justify-center text-white text-sm font-bold`}
+                      >
+                        {toNetwork.symbol[0]}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium">{toNetwork.name}</div>
+                        <div className="text-xs text-muted-foreground">{toNetwork.symbol}</div>
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-80">
+                    <ScrollArea className="h-64">
+                      {toNetworks.map((network) => (
+                        <DropdownMenuItem
+                          key={network.id}
+                          onClick={() => handleToNetworkSelect(network)}
+                          className="flex items-center gap-3 p-3 cursor-pointer"
+                        >
+                          <div
+                            className={`w-8 h-8 ${network.color} rounded-full flex items-center justify-center text-white text-sm font-bold`}
+                          >
+                            {network.symbol[0]}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium">{network.name}</div>
+                            <div className="text-xs text-muted-foreground">{network.symbol}</div>
+                          </div>
+                          {network.id === toNetwork.id && (
+                            <Check className="w-4 h-4 text-primary" />
+                          )}
+                        </DropdownMenuItem>
+                      ))}
+                    </ScrollArea>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </Card>
 
               <Card className="p-4 bg-secondary/50 border-border/50">

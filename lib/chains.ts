@@ -10,7 +10,7 @@ export interface ChainConfig {
   name: string;
   displayName: string;
   wsUrls: readonly string[];
-  chainSpec: () => Promise<{ chainSpec: any }>;
+  chainSpec?: () => Promise<{ chainSpec: any }>;
   descriptorName: string;
   isTestnet?: boolean;
   symbol: string;
@@ -90,16 +90,15 @@ export const supportedChains = {
   //   descriptorName: "paseoah",
   //   isTestnet: true,
   // },
-  // passet: {
-  //   name: "passet",
-  //   displayName: "Passet Hub",
-  //   symbol: "PAS",
-  //   decimals: 10,
-  //   wsUrls: ["wss://testnet-passet-hub.polkadot.io"],
-  //   chainSpec: () => import("polkadot-api/chains/paseo_asset_hub"),
-  //   descriptorName: "passet",
-  //   isTestnet: true,
-  // }
+  passet: {
+    name: "passet",
+    displayName: "Passet Hub",
+    symbol: "PAS",
+    decimals: 10,
+    wsUrls: ["wss://testnet-passet-hub.polkadot.io"],
+    descriptorName: "passet",
+    isTestnet: true,
+  },
   wah:{
     name: "wah",
     displayName: "Westend Asset Hub",
@@ -115,13 +114,21 @@ export const supportedChains = {
 
 export const supportedPolkaVMChains = {
 
-  paseoAssetHub: {
-    name: "paseoAssetHub",
-    displayName: "Paseo PolkaVM Asset Hub",
+  passet: {
+    name: "passet",
+    displayName: "Passet PolkaVM Asset Hub",
     symbol: "PAS",
     rpc: "https://testnet-passet-hub-eth-rpc.polkadot.io",
     chainId: 420420422
   },
+  wah: {
+    name: "wah",
+    displayName: "Westend PolkaVM Asset Hub",
+    symbol: "WND",
+    rpc: "https://westend-asset-hub-eth-rpc.polkadot.io",
+    chainId: 420420421
+  }
+
 
 } as const;
 
