@@ -309,34 +309,41 @@ export function AccountSelectDrawer({
       // Convert accounts to our format and resolve signer for each
       const polkadotAccounts = await Promise.all(accounts.map(async (account: any) => {
         // Get the proper signer for this specific account
-        let signer = null
+        let pjsSigner = null
         
         // Try wallet extension signer first
         if (walletExtension.signer) {
-          signer = walletExtension.signer
+          pjsSigner = walletExtension.signer
           console.log(`Using wallet extension signer for ${account.address}`)
         } else {
           // Fallback: get signer using web3FromSource
           try {
             const { web3FromSource } = await import('@polkadot/extension-dapp')
             const injector = await web3FromSource(wallet.id)
-            signer = injector.signer
+            pjsSigner = injector.signer
             console.log(`Using web3FromSource signer for ${account.address}`)
           } catch (signerError) {
             console.warn(`Could not get signer for ${wallet.displayName} account ${account.address}:`, signerError)
           }
         }
 
-        if (!signer) {
-          console.error(`No signer available for account ${account.address} from ${wallet.displayName}`)
-        } else {
+        let polkadotApiSigner = null
+        if (pjsSigner && pjsSigner.signPayload && pjsSigner.signRaw) {
+          const { getPolkadotSignerFromPjs } = await import('@/features/wallet-connect/pjs-signer/from-pjs-account')
+          polkadotApiSigner = getPolkadotSignerFromPjs(
+            account.address,
+            pjsSigner.signPayload.bind(pjsSigner) as SignPayload,
+            pjsSigner.signRaw.bind(pjsSigner) as SignRaw
+          )
           console.log(`Successfully resolved signer for account ${account.address}`)
+        } else {
+          console.error(`No signer available for account ${account.address} from ${wallet.displayName}`)
         }
 
         return {
           address: account.address,
           name: account.meta?.name || account.name || `${wallet.displayName} Account`,
-          polkadotSigner: signer,
+          polkadotSigner: polkadotApiSigner,
           genesisHash: account.meta?.genesisHash || account.genesisHash,
           type: account.type,
           walletId: wallet.id,
@@ -491,11 +498,21 @@ export function AccountSelectDrawer({
                       try {
                         const { web3FromSource } = await import('@polkadot/extension-dapp')
                         const injector = await web3FromSource(account.walletId)
-                        accountWithSigner = {
-                          ...account,
-                          polkadotSigner: injector.signer as any
+                        if (injector.signer && injector.signer.signPayload && injector.signer.signRaw) {
+                          const { getPolkadotSignerFromPjs } = await import('@/features/wallet-connect/pjs-signer/from-pjs-account')
+                          const polkadotApiSigner = getPolkadotSignerFromPjs(
+                            account.address,
+                            injector.signer.signPayload.bind(injector.signer) as SignPayload,
+                            injector.signer.signRaw.bind(injector.signer) as SignRaw
+                          )
+                          accountWithSigner = {
+                            ...account,
+                            polkadotSigner: polkadotApiSigner
+                          }
+                          console.log('✅ Signer resolved for account:', account.address)
+                        } else {
+                          throw new Error('No valid signer found in injector')
                         }
-                        console.log('✅ Signer resolved for account:', account.address)
                       } catch (error) {
                         console.error('❌ Failed to resolve signer:', error)
                         toast.error('Failed to get wallet signer. Please try reconnecting.')

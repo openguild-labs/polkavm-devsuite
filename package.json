@@ -73,13 +73,14 @@
 		"@walletconnect/types": "^2.17.2",
 		"@walletconnect/universal-provider": "^2.17.2",
 		"@walletconnect/utils": "^2.17.2",
-    "@polkadot-api/metadata-builders": "^0.11.0",
+    "@polkadot-api/metadata-builders": "^0.13.5",
 		"@polkadot-api/polkadot-signer": "^0.1.6",
-		"@polkadot-api/substrate-bindings": "^0.12.0",
-    "@polkadot/extension-dapp": "^0.50.1",
+		"@polkadot-api/substrate-bindings": "^0.16.3",
+    "@polkadot/extension-dapp": "^0.61.5",
     "@polkadot/util": "^13.2.3",
     "@polkadot/util-crypto": "^13.2.3",
-    "@talismn/orb": "0.3.0"
+    "@talismn/orb": "0.3.0",
+    "@polkadot-api/signers-common":"0.1.16"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",

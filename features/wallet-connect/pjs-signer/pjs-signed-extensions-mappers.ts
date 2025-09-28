@@ -1,94 +1,93 @@
-import type { HexString } from "@polkadot-api/substrate-bindings";
+import { HexString } from "@polkadot-api/substrate-bindings"
 import {
-	Bytes,
-	Option,
-	Struct,
-	compact,
-	compactBn,
-	u32,
-} from "@polkadot-api/substrate-bindings";
-import { toHex } from "@polkadot-api/utils";
+  Bytes,
+  Struct,
+  compact,
+  u32,
+  Option,
+  compactBn,
+} from "@polkadot-api/substrate-bindings"
+import { toHex } from "@polkadot-api/utils"
 
 type SignedExtension = {
-	value: Uint8Array;
-	additionalSigned: Uint8Array;
-};
+  value: Uint8Array
+  additionalSigned: Uint8Array
+}
 
 const toPjsHex = (value: number | bigint, minByteLen?: number) => {
-	let inner = value.toString(16);
-	inner = (inner.length % 2 ? "0" : "") + inner;
-	const nPaddedBytes = Math.max(0, (minByteLen || 0) - inner.length / 2);
-	// biome-ignore lint/style/useTemplate: <explanation>
-	return "0x" + "00".repeat(nPaddedBytes) + inner;
-};
+  let inner = value.toString(16)
+  inner = (inner.length % 2 ? "0" : "") + inner
+  const nPaddedBytes = Math.max(0, (minByteLen || 0) - inner.length / 2)
+  return "0x" + "00".repeat(nPaddedBytes) + inner
+}
 
 export const CheckGenesis = ({
-	additionalSigned,
+  additionalSigned,
 }: SignedExtension): { genesisHash: string } => ({
-	genesisHash: toHex(additionalSigned),
-});
+  genesisHash: toHex(additionalSigned),
+})
 
 export const CheckNonce = ({
-	value,
+  value,
 }: SignedExtension): { nonce: HexString } => {
-	// nonce is a u32 in pjs => 4 bytes
-	return { nonce: toPjsHex(compact.dec(value), 4) };
-};
+  // nonce is a u32 in pjs => 4 bytes
+  return { nonce: toPjsHex(compact.dec(value), 4) }
+}
 
 export const CheckTxVersion = ({
-	additionalSigned,
+  additionalSigned,
 }: SignedExtension): { transactionVersion: HexString } => {
-	return { transactionVersion: toPjsHex(u32.dec(additionalSigned), 4) };
-};
+  return { transactionVersion: toPjsHex(u32.dec(additionalSigned), 4) }
+}
 
 const assetTxPaymentDec = Struct({
-	tip: compact,
-	asset: Option(Bytes(Number.POSITIVE_INFINITY)),
-}).dec;
+  tip: compact,
+  asset: Option(Bytes(Infinity)),
+}).dec
 
 export const ChargeAssetTxPayment = ({
-	value,
+  value,
 }: SignedExtension): { aseetId?: string; tip?: string } => {
-	const { tip, asset } = assetTxPaymentDec(value);
+  const { tip, asset } = assetTxPaymentDec(value)
 
-	return {
-		...(asset ? { assetId: toHex(asset) } : {}),
-		tip: toPjsHex(tip, 16),
-	};
-};
+  return {
+    ...(asset ? { assetId: toHex(asset) } : {}),
+    tip: toPjsHex(tip, 16),
+  }
+}
 
 export const ChargeTransactionPayment = ({
-	value,
+  value,
 }: SignedExtension): { tip: HexString } => ({
-	tip: toPjsHex(compactBn.dec(value), 16), // u128 => 16 bytes
-});
+  tip: toPjsHex(compactBn.dec(value), 16), // u128 => 16 bytes
+})
 
 export const CheckMortality = (
-	{ value, additionalSigned }: SignedExtension,
-	blockNumber: number,
+  { value, additionalSigned }: SignedExtension,
+  blockNumber: number,
 ): { era: HexString; blockHash: HexString; blockNumber: HexString } => ({
-	era: toHex(value),
-	blockHash: toHex(additionalSigned),
-	blockNumber: toPjsHex(blockNumber, 4),
-});
+  era: toHex(value),
+  blockHash: toHex(additionalSigned),
+  blockNumber: toPjsHex(blockNumber, 4),
+})
 
 export const CheckSpecVersion = ({
-	additionalSigned,
+  additionalSigned,
 }: SignedExtension): { specVersion: HexString } => ({
-	specVersion: toPjsHex(u32.dec(additionalSigned), 4),
-});
+  specVersion: toPjsHex(u32.dec(additionalSigned), 4),
+})
 
 export const CheckMetadataHash = ({
-	value,
-	additionalSigned,
+  value,
+  additionalSigned,
 }: SignedExtension): { mode?: number; metadataHash?: HexString } =>
-	value.length && value[0]
-		? {
-				mode: 1,
-				metadataHash: toHex(
-					additionalSigned.length
-						? additionalSigned.slice(1)
-						: additionalSigned,
-				),
-			}
-		: {};
+  value.length && value[0]
+    ? {
+        mode: 1,
+        metadataHash: toHex(
+          additionalSigned.length
+            ? additionalSigned.slice(1)
+            : additionalSigned,
+        ),
+      }
+    : {}
