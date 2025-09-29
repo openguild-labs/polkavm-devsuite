@@ -108,7 +108,19 @@ export const supportedChains = {
     chainSpec: () => import("polkadot-api/chains/westend2_asset_hub"),
     descriptorName: "wah",
     isTestnet: true,
-  }
+  },
+  kah:{
+    name: "kah",
+    displayName: "Kusama Asset Hub",
+    symbol: "KUS",
+    decimals: 12,
+    wsUrls: ["wss://kusama-asset-hub-rpc.polkadot.io"],
+    chainSpec: () => import("polkadot-api/chains/ksmcc3_asset_hub"),
+    descriptorName: "kah",
+    isTestnet: false,
+  },
+
+  
 } as const;
 
 
@@ -128,6 +140,14 @@ export const supportedPolkaVMChains = {
     symbol: "WND",
     rpcUrl: "https://westend-asset-hub-eth-rpc.polkadot.io",
     chainId: 420420421,
+    decimals: 18
+  },
+  kah: {
+    name: "kah",
+    displayName: "Kusama PolkaVM Asset Hub",
+    symbol: "KUS",
+    rpcUrl: "https://kusama-asset-hub-eth-rpc.polkadot.io",
+    chainId: 420420418,
     decimals: 18
   }
 

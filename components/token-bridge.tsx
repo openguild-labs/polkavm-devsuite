@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { ArrowUpDown, Wallet, ChevronDown, Zap, Clock, Copy, Check } from "lucide-react"
+import { ArrowUpDown, Wallet, ChevronDown, Zap, Clock, Copy, Check, X, ExternalLink, Loader2 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,19 +48,35 @@ export function convertPublicKeyToSs58(publickey: Uint8Array) {
 
 
 // Helper function to ensure account is mapped
-async function ensureAccountMapped(api: any, signer: any, senderAddress: string) {
+async function ensureAccountMapped(api: any, signer: any, senderAddress: string, setTransactionSteps: any, setCurrentTxHash: any) {
   const ss58Address = convertPublicKeyToSs58(signer.publicKey);
   const mapped = await api.query.Revive.OriginalAccount.getValue(
     ss58ToH160(ss58Address),
   );
 
   if (mapped) {
-    console.log(`Account already mapped to`);
+    console.log(`Account already mapped`);
+    setTransactionSteps((prev: any) => ({
+      ...prev,
+      mapAccount: { status: 'completed', txHash: null }
+    }));
     return;
   }
 
   console.log('Mapping account...');
-  await mapAccount(api, signer);
+  setTransactionSteps((prev: any) => ({
+    ...prev,
+    mapAccount: { status: 'active', txHash: null }
+  }));
+  
+  const result = await mapAccount(api, signer);
+  const txHash = (result as any).txHash;
+  
+  setTransactionSteps((prev: any) => ({
+    ...prev,
+    mapAccount: { status: 'completed', txHash }
+  }));
+  setCurrentTxHash(txHash);
 }
 
 
@@ -148,6 +170,8 @@ const getTokensForNetwork = (networkId: string) => {
       return [{ symbol: "PAS", name: "Paseo Token", price: "$" }]
     case 'wah':
       return [{ symbol: "WND", name: "Westend Token", price: "$" }]
+    case 'kah': 
+      return [{ symbol: "KUS", name: "Kusama Token", price: "$" }]
     default:
       return [{ symbol: "WND", name: "Westend Token", price: "$" }]
   }
@@ -168,6 +192,12 @@ export function TokenBridge() {
   const [bridgeError, setBridgeError] = useState<string | null>(null)
   const [evmBalance, setEvmBalance] = useState<string | null>(null)
   const [isLoadingEvmBalance, setIsLoadingEvmBalance] = useState(false)
+  const [showTransactionDialog, setShowTransactionDialog] = useState(false)
+  const [transactionSteps, setTransactionSteps] = useState({
+    mapAccount: { status: 'pending' as 'pending' | 'active' | 'completed', txHash: null as string | null },
+    call: { status: 'pending' as 'pending' | 'active' | 'completed', txHash: null as string | null }
+  })
+  const [currentTxHash, setCurrentTxHash] = useState<string | null>(null)
 
   // Format balance from planck to human readable
   const formatBalance = (balance: bigint, decimals: number = 10): string => {
@@ -388,6 +418,12 @@ export function TokenBridge() {
 
     setIsBridging(true)
     setBridgeError(null)
+    setShowTransactionDialog(true)
+    setTransactionSteps({
+      mapAccount: { status: 'pending', txHash: null },
+      call: { status: 'pending', txHash: null }
+    })
+    setCurrentTxHash(null)
 
     try {
       console.log('🌉 Starting bridge transaction...')
@@ -397,8 +433,6 @@ export function TokenBridge() {
         amount: amount,
         chainId: fromNetwork.id
       })
-
-      toast.loading('Preparing bridge transaction...', { id: 'bridge-tx' })
 
       // Validate amount
       if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
@@ -502,12 +536,16 @@ export function TokenBridge() {
 
       // Ensure account is mapped before proceeding
       console.log('🔍 Checking if account is mapped...')
-      toast.loading('Checking account mapping...', { id: 'bridge-tx' })
       
-      await ensureAccountMapped(chainClient.typedApi, signer, selectedAccount.address)
+      await ensureAccountMapped(chainClient.typedApi, signer, selectedAccount.address, setTransactionSteps, setCurrentTxHash)
 
-      console.log('✍️ Signing transaction...')
-      toast.loading('Please sign the transaction in your wallet...', { id: 'bridge-tx' })
+      console.log('✍️ Signing call transaction...')
+      
+      // Update step to active
+      setTransactionSteps((prev: any) => ({
+        ...prev,
+        call: { status: 'active', txHash: null }
+      }))
       
       // Sign and submit transaction using the compatible signer
       let result
@@ -539,6 +577,15 @@ export function TokenBridge() {
         })
         
         console.log('✅ Transaction successful:', result)
+        
+        // Update call step to completed
+        const txHash = (result as any).txHash;
+        setTransactionSteps((prev: any) => ({
+          ...prev,
+          call: { status: 'completed', txHash }
+        }));
+        setCurrentTxHash(txHash);
+        
       } catch (signError: any) {
         console.error('❌ SignAndSubmit failed:', signError)
         console.error('❌ Error details:', {
@@ -593,6 +640,11 @@ export function TokenBridge() {
 
       console.log('🔗 Transaction hash:', txHash)
 
+      // Close dialog after a short delay
+      setTimeout(() => {
+        setShowTransactionDialog(false)
+      }, 2000)
+
       toast.success(
         <div className="space-y-1">
           <div className="font-medium">Bridge successful! 🎉</div>
@@ -616,6 +668,7 @@ export function TokenBridge() {
       console.error('❌ Bridge transaction failed:', error)
       const errorMessage = error instanceof Error ? error.message : 'Bridge transaction failed'
       setBridgeError(errorMessage)
+      setShowTransactionDialog(false)
 
       toast.error(
         <div className="space-y-1">
@@ -656,25 +709,6 @@ export function TokenBridge() {
           </p>
         </div>
 
-        {/* Debug Info (Development Only) */}
-        {process.env.NODE_ENV === 'development' && (
-          <Card className="p-4 mb-6 bg-yellow-50 border-yellow-200">
-            <div className="text-sm space-y-2">
-              <div className="font-medium text-yellow-800">🔍 Debug Info:</div>
-              <div className="text-yellow-700">
-                <div>From Network: {fromNetwork.name} ({fromNetwork.id})</div>
-                <div>Selected Account: {selectedAccount?.address || 'None'}</div>
-                <div>Account Wallet: {selectedAccount?.walletName || 'None'}</div>
-                <div>Signer Available: {selectedAccount?.polkadotSigner ? '✅ Yes' : '❌ No'}</div>
-                <div>Chain Client: {chainClient ? `✅ ${chainClient.chainName}` : '❌ Not connected'}</div>
-                <div>Balance: {accountBalance} {fromNetwork.symbol}</div>
-                <div>Is Loading: {isLoadingBalance ? 'Yes' : 'No'}</div>
-                <div>Is Bridging: {isBridging ? 'Yes' : 'No'}</div>
-                {bridgeError && <div className="text-red-600">Error: {bridgeError}</div>}
-              </div>
-            </div>
-          </Card>
-        )}
 
         {/* Bridge Error Display */}
         {bridgeError && (
@@ -986,6 +1020,107 @@ export function TokenBridge() {
           </Button>
         </Card>
       </div>
+
+      {/* Transaction Progress Dialog */}
+      <Dialog open={showTransactionDialog} onOpenChange={setShowTransactionDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-lg font-bold text-blue-600">Transaction Progress</DialogTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowTransactionDialog(false)}
+                className="h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">Bridging tokens to PolkaVM...</p>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Current Transaction Hash */}
+            {currentTxHash && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Current TX:</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-mono text-blue-600 underline">
+                    {currentTxHash.slice(0, 6)}...{currentTxHash.slice(-4)}
+                  </span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                    <ExternalLink className="h-3 w-3" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Transaction Steps */}
+            <div className="space-y-3">
+              {/* Map Account Step */}
+              <div className="flex items-center gap-3">
+                {transactionSteps.mapAccount.status === 'completed' ? (
+                  <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                    <Check className="h-4 w-4 text-white" />
+                  </div>
+                ) : transactionSteps.mapAccount.status === 'active' ? (
+                  <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
+                    <Loader2 className="h-4 w-4 text-white animate-spin" />
+                  </div>
+                ) : (
+                  <div className="w-6 h-6 rounded-full border-2 border-gray-300" />
+                )}
+                <span className={`text-sm ${transactionSteps.mapAccount.status === 'active' ? 'text-blue-600 font-medium' : transactionSteps.mapAccount.status === 'completed' ? 'text-green-600' : 'text-gray-500'}`}>
+                  Map Account
+                </span>
+              </div>
+
+              {/* Call Step */}
+              <div className="flex items-center gap-3">
+                {transactionSteps.call.status === 'completed' ? (
+                  <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                    <Check className="h-4 w-4 text-white" />
+                  </div>
+                ) : transactionSteps.call.status === 'active' ? (
+                  <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
+                    <Loader2 className="h-4 w-4 text-white animate-spin" />
+                  </div>
+                ) : (
+                  <div className="w-6 h-6 rounded-full border-2 border-gray-300" />
+                )}
+                <span className={`text-sm ${transactionSteps.call.status === 'active' ? 'text-blue-600 font-medium' : transactionSteps.call.status === 'completed' ? 'text-green-600' : 'text-gray-500'}`}>
+                  Bridge Call
+                </span>
+              </div>
+            </div>
+
+            {/* Status Message */}
+            {transactionSteps.mapAccount.status === 'active' && (
+              <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <Loader2 className="h-4 w-4 text-yellow-600 animate-spin" />
+                <span className="text-sm text-yellow-800">Waiting for confirmation...</span>
+              </div>
+            )}
+            {transactionSteps.call.status === 'active' && (
+              <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <Loader2 className="h-4 w-4 text-yellow-600 animate-spin" />
+                <span className="text-sm text-yellow-800">Waiting for confirmation...</span>
+              </div>
+            )}
+
+            {/* Processing Button */}
+            <Button 
+              className="w-full bg-pink-500 hover:bg-pink-600 text-white"
+              disabled
+            >
+              Processing...
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
