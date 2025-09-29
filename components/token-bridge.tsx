@@ -803,7 +803,15 @@ export function TokenBridge() {
                 type="number"
                 placeholder="0.0"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value
+                  // Only allow positive numbers
+                  if (value === '' || (Number(value) >= 0 && !isNaN(Number(value)))) {
+                    setAmount(value)
+                  }
+                }}
+                min="0"
+                step="0.0001"
                 className="text-2xl h-16 bg-secondary/30 border-border/50 pr-20"
               />
               <Button
@@ -832,21 +840,6 @@ export function TokenBridge() {
                       className="h-6 px-2 text-xs"
                     >
                       🔄
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        console.log('🧪 Manual test - Chain client state:', {
-                          chainClient: chainClient,
-                          windowClient: (window as any).__PAPI_CLIENT__,
-                          windowApi: (window as any).__PAPI_API__,
-                          selectedAccount: selectedAccount
-                        })
-                      }}
-                      className="h-6 px-2 text-xs"
-                    >
-                      🧪
                     </Button>
                   </div>
                 )}
@@ -1025,17 +1018,7 @@ export function TokenBridge() {
       <Dialog open={showTransactionDialog} onOpenChange={setShowTransactionDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-lg font-bold text-blue-600">Transaction Progress</DialogTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowTransactionDialog(false)}
-                className="h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            <DialogTitle className="text-lg font-bold text-blue-600">Transaction Progress</DialogTitle>
             <p className="text-sm text-muted-foreground">Bridging tokens to PolkaVM...</p>
           </DialogHeader>
           
