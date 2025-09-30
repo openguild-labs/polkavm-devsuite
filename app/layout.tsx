@@ -8,9 +8,9 @@ import { WalletProvider } from '@/hooks/use-wallet'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: 'PolkaVM DevTool',
+  description: 'Bridge Your Tokens to PolkaVM Asset Hub',
+  generator: 'polkavm-tool',
 }
 
 export default function RootLayout({
