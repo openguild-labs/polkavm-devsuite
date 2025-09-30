@@ -167,13 +167,13 @@ const toNetworks = Object.entries(supportedPolkaVMChains).map(([key, config]) =>
 const getTokensForNetwork = (networkId: string) => {
   switch (networkId) {
     case 'passet':
-      return [{ symbol: "PAS", name: "Paseo Token", price: "$" }]
+      return [{ symbol: "PAS", name: "Paseo Token", price: "$", imageUrl:"https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/tokens/dot.svg" }]
     case 'wah':
-      return [{ symbol: "WND", name: "Westend Token", price: "$" }]
+      return [{ symbol: "WND", name: "Westend Token", price: "$", imageUrl:"https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/tokens/dot.svg" }]
     case 'kah': 
-      return [{ symbol: "KUS", name: "Kusama Token", price: "$" }]
-    default:
-      return [{ symbol: "WND", name: "Westend Token", price: "$" }]
+      return [{ symbol: "KUS", name: "Kusama Token", price: "$", imageUrl:"https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/kusama.svg" }]
+      default:
+        return [{ symbol: "WND", name: "Westend Token", price: "$", imageUrl:"https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/tokens/dot.svg" }]
   }
 }
 
@@ -806,8 +806,20 @@ export function TokenBridge() {
 
               <Card className="p-4 bg-secondary/50 border-border/50">
                 <div className="flex items-center gap-3 cursor-pointer">
-                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold">
-                    {selectedToken.symbol[0]}
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                    <img 
+                      src={selectedToken.imageUrl} 
+                      alt={selectedToken.name}
+                      className="w-8 h-8 object-contain"
+                      onError={(e) => {
+                        // Fallback to first letter if image fails to load
+                        e.currentTarget.style.display = 'none'
+                        e.currentTarget.nextElementSibling!.style.display = 'flex'
+                      }}
+                    />
+                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold hidden">
+                      {selectedToken.symbol[0]}
+                    </div>
                   </div>
                   <div className="flex-1">
                     <div className="font-medium">{selectedToken.symbol}</div>
@@ -955,8 +967,20 @@ export function TokenBridge() {
 
               <Card className="p-4 bg-secondary/50 border-border/50">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold">
-                    {selectedToken.symbol[0]}
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                    <img 
+                      src={selectedToken.imageUrl} 
+                      alt={selectedToken.name}
+                      className="w-8 h-8 object-contain"
+                      onError={(e) => {
+                        // Fallback to first letter if image fails to load
+                        e.currentTarget.style.display = 'none'
+                        e.currentTarget.nextElementSibling!.style.display = 'flex'
+                      }}
+                    />
+                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold hidden">
+                      {selectedToken.symbol[0]}
+                    </div>
                   </div>
                   <div className="flex-1">
                     <div className="font-medium">{selectedToken.symbol}</div>
@@ -986,7 +1010,7 @@ export function TokenBridge() {
             <div className="relative">
               <Input
                 type="text"
-                placeholder="0x742d35Cc6634C0532925a3b8D4C9db96590e4CAb"
+                placeholder="Your EVM address here"
                 value={recipientAddress}
                 onChange={(e) => setRecipientAddress(e.target.value)}
                 className={`pr-12 ${recipientAddress && !isValidEvmAddress(recipientAddress)
