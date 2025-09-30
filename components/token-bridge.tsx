@@ -40,6 +40,7 @@ import { getPolkadotSignerFromPjs } from "@/features/wallet-connect/pjs-signer/f
 import type { SignPayload, SignRaw } from "@/features/wallet-connect/pjs-signer/types"
 import { ss58ToH160 } from "@/lib/utils"
 
+import { ethers } from 'ethers'
 
 const SS58_PREFIX = 42;
 export function convertPublicKeyToSs58(publickey: Uint8Array) {
@@ -356,31 +357,15 @@ export function TokenBridge() {
         throw new Error(`No RPC URL configured for ${toNetwork.name}`)
       }
       
-      const response = await fetch(networkConfig.rpcUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'eth_getBalance',
-          params: [address, 'latest'],
-          id: 1,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data = await response.json()
-      if (data.error) {
-        throw new Error(data.error.message)
-      }
+      // Create ethers provider with the RPC URL
+      const provider = new ethers.JsonRpcProvider(networkConfig.rpcUrl)
       
-      const balanceInWei = BigInt(data.result)
+      // Get balance using ethers
+      const balance = await provider.getBalance(address)
+      
+      // Format balance with proper decimals
       const decimals = networkConfig.decimals || 18
-      const formattedBalance = formatBalance(balanceInWei, decimals)
+      const formattedBalance = formatBalance(balance, decimals)
       setEvmBalance(formattedBalance)
     } catch (error) {
       console.error('Failed to fetch EVM balance:', error)
