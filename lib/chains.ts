@@ -15,6 +15,7 @@ export interface ChainConfig {
   isTestnet?: boolean;
   symbol: string;
   decimals: number;
+  imageUrl: string;
 }
 
 
@@ -25,6 +26,7 @@ export interface PolkaVMChainConfig {
   rpc: string;
   symbol: string;
   chainId: number;
+  imageUrl: string;
 }
 
 
@@ -98,6 +100,7 @@ export const supportedChains = {
     wsUrls: ["wss://testnet-passet-hub.polkadot.io"],
     descriptorName: "passet",
     isTestnet: true,
+    imageUrl:"https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/pasero-asset-hub.svg"
   },
   wah:{
     name: "wah",
@@ -108,6 +111,7 @@ export const supportedChains = {
     chainSpec: () => import("polkadot-api/chains/westend2_asset_hub"),
     descriptorName: "wah",
     isTestnet: true,
+    imageUrl:"https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/polkadot-asset-hub.svg"
   },
   kah:{
     name: "kah",
@@ -118,6 +122,7 @@ export const supportedChains = {
     chainSpec: () => import("polkadot-api/chains/ksmcc3_asset_hub"),
     descriptorName: "kah",
     isTestnet: false,
+    imageUrl:"https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/kusama-asset-hub.svg"
   },
 
   
@@ -132,7 +137,8 @@ export const supportedPolkaVMChains = {
     symbol: "PAS",
     rpcUrl: "https://testnet-passet-hub-eth-rpc.polkadot.io",
     chainId: 420420422,
-    decimals: 18
+    decimals: 18,
+    imageUrl: "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/pasero-asset-hub.svg"
   },
   wah: {
     name: "wah",
@@ -140,7 +146,8 @@ export const supportedPolkaVMChains = {
     symbol: "WND",
     rpcUrl: "https://westend-asset-hub-eth-rpc.polkadot.io",
     chainId: 420420421,
-    decimals: 18
+    decimals: 18,
+    imageUrl: "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/polkadot-asset-hub.svg"
   },
   kah: {
     name: "kah",
@@ -148,7 +155,8 @@ export const supportedPolkaVMChains = {
     symbol: "KUS",
     rpcUrl: "https://kusama-asset-hub-eth-rpc.polkadot.io",
     chainId: 420420418,
-    decimals: 18
+    decimals: 18,
+    imageUrl: "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/kusama-asset-hub.svg"
   }
 
 

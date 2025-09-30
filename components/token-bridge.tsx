@@ -152,7 +152,7 @@ const fromNetworks = Object.entries(supportedChains).map(([key, config]) => ({
   id: key as SupportedChain,
   name: config.displayName,
   symbol: config.symbol,
-  color: networkColors[key] || "bg-gray-500"
+  imageUrl: config.imageUrl
 }))
 
 // Convert supportedPolkaVMChains to format expected by UI  
@@ -160,7 +160,7 @@ const toNetworks = Object.entries(supportedPolkaVMChains).map(([key, config]) =>
   id: key as SupportedPolkaVMChain,
   name: config.displayName,
   symbol: config.symbol,
-  color: networkColors[key] || "bg-blue-500"
+  imageUrl: config.imageUrl
 }))
 
 // Token mapping based on network
@@ -745,10 +745,20 @@ export function TokenBridge() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
-                      <div
-                        className={`w-8 h-8 ${fromNetwork.color} rounded-full flex items-center justify-center text-white text-sm font-bold`}
-                      >
-                        {fromNetwork.symbol[0]}
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                        <img 
+                          src={fromNetwork.imageUrl} 
+                          alt={fromNetwork.name}
+                          className="w-8 h-8 object-contain"
+                          onError={(e) => {
+                            // Fallback to first letter if image fails to load
+                            e.currentTarget.style.display = 'none'
+                            e.currentTarget.nextElementSibling!.style.display = 'flex'
+                          }}
+                        />
+                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
+                          {fromNetwork.symbol[0]}
+                        </div>
                       </div>
                       <div className="flex-1">
                         <div className="font-medium">{fromNetwork.name}</div>
@@ -765,10 +775,20 @@ export function TokenBridge() {
                           onClick={() => handleFromNetworkSelect(network)}
                           className="flex items-center gap-3 p-3 cursor-pointer"
                         >
-                          <div
-                            className={`w-8 h-8 ${network.color} rounded-full flex items-center justify-center text-white text-sm font-bold`}
-                          >
-                            {network.symbol[0]}
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                            <img 
+                              src={network.imageUrl} 
+                              alt={network.name}
+                              className="w-8 h-8 object-contain"
+                              onError={(e) => {
+                                // Fallback to first letter if image fails to load
+                                e.currentTarget.style.display = 'none'
+                                e.currentTarget.nextElementSibling!.style.display = 'flex'
+                              }}
+                            />
+                            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
+                              {network.symbol[0]}
+                            </div>
                           </div>
                           <div className="flex-1">
                             <div className="font-medium">{network.name}</div>
@@ -874,10 +894,20 @@ export function TokenBridge() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
-                      <div
-                        className={`w-8 h-8 ${toNetwork.color} rounded-full flex items-center justify-center text-white text-sm font-bold`}
-                      >
-                        {toNetwork.symbol[0]}
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                        <img 
+                          src={toNetwork.imageUrl} 
+                          alt={toNetwork.name}
+                          className="w-8 h-8 object-contain"
+                          onError={(e) => {
+                            // Fallback to first letter if image fails to load
+                            e.currentTarget.style.display = 'none'
+                            e.currentTarget.nextElementSibling!.style.display = 'flex'
+                          }}
+                        />
+                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
+                          {toNetwork.symbol[0]}
+                        </div>
                       </div>
                       <div className="flex-1">
                         <div className="font-medium">{toNetwork.name}</div>
@@ -894,10 +924,20 @@ export function TokenBridge() {
                           onClick={() => handleToNetworkSelect(network)}
                           className="flex items-center gap-3 p-3 cursor-pointer"
                         >
-                          <div
-                            className={`w-8 h-8 ${network.color} rounded-full flex items-center justify-center text-white text-sm font-bold`}
-                          >
-                            {network.symbol[0]}
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                            <img 
+                              src={network.imageUrl} 
+                              alt={network.name}
+                              className="w-8 h-8 object-contain"
+                              onError={(e) => {
+                                // Fallback to first letter if image fails to load
+                                e.currentTarget.style.display = 'none'
+                                e.currentTarget.nextElementSibling!.style.display = 'flex'
+                              }}
+                            />
+                            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
+                              {network.symbol[0]}
+                            </div>
                           </div>
                           <div className="flex-1">
                             <div className="font-medium">{network.name}</div>

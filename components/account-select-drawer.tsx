@@ -427,8 +427,20 @@ export function AccountSelectDrawer({
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-2xl">
-                        {wallet.icon}
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden">
+                        <img 
+                          src={wallet.icon} 
+                          alt={wallet.displayName}
+                          className="w-8 h-8 object-contain"
+                          onError={(e) => {
+                            // Fallback to a default icon if image fails to load
+                            e.currentTarget.style.display = 'none'
+                            e.currentTarget.nextElementSibling!.style.display = 'flex'
+                          }}
+                        />
+                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
+                          {wallet.displayName[0]}
+                        </div>
                       </div>
                       <div>
                         <div className="font-medium">{wallet.displayName}</div>
@@ -454,11 +466,23 @@ export function AccountSelectDrawer({
                 className={`p-4 cursor-pointer hover:bg-secondary/50 ${isConnecting === wallet.id ? 'opacity-50' : ''}`} 
                 onClick={() => isConnecting !== wallet.id && connectToExternalWallet(wallet)}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-2xl">
-                      {wallet.icon}
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden">
+                        <img 
+                          src={wallet.icon} 
+                          alt={wallet.displayName}
+                          className="w-8 h-8 object-contain"
+                          onError={(e) => {
+                            // Fallback to a default icon if image fails to load
+                            e.currentTarget.style.display = 'none'
+                            e.currentTarget.nextElementSibling!.style.display = 'flex'
+                          }}
+                        />
+                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
+                          {wallet.displayName[0]}
+                        </div>
+                      </div>
                     <div>
                       <div className="font-medium">{wallet.displayName}</div>
                       <div className="text-xs text-muted-foreground">
