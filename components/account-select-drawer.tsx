@@ -504,9 +504,24 @@ export function AccountSelectDrawer({
           {/* Connected Accounts */}
           {allAccounts.length > 0 && (
             <div className="space-y-3">
-              <h3 className="text-sm font-medium text-muted-foreground">Connected Accounts</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-muted-foreground">Connected Accounts</h3>
+                {allAccounts.length > 2 && (
+                  <span className="text-xs text-muted-foreground">
+                    {allAccounts.length} accounts
+                  </span>
+                )}
+              </div>
               
-              {allAccounts.map((account, index) => (
+              <div className="relative">
+                <div 
+                  className="max-h-64 overflow-y-auto space-y-2 pr-2"
+                  style={{
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#d1d5db #f3f4f6'
+                  }}
+                >
+                  {allAccounts.map((account, index) => (
                 <Card 
                   key={`${account.address}-${index}`}
                   className={`p-4 cursor-pointer transition-colors hover:bg-secondary/50 ${
@@ -604,7 +619,13 @@ export function AccountSelectDrawer({
                     </div>
                   </div>
                 </Card>
-              ))}
+                  ))}
+                </div>
+                {/* Fade indicator when there are more accounts */}
+                {allAccounts.length > 2 && (
+                  <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+                )}
+              </div>
             </div>
           )}
 
