@@ -23,7 +23,7 @@ export interface ChainConfig {
 export interface PolkaVMChainConfig {
   name: string;
   displayName: string;
-  rpc: string;
+  rpcUrl: string;
   symbol: string;
   chainId: number;
   imageUrl: string;
