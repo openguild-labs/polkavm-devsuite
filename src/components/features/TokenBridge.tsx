@@ -29,28 +29,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { WalletConnect } from "./WalletConnect";
+import { FROM_NETWORKS, TO_NETWORKS, CHAINS, POLKAVM_CHAINS, type SupportedChain, type SupportedPolkaVMChain } from "@/constants";
 
 export function TokenBridge() {
-  const [fromNetwork, setFromNetwork] = useState({
-    id: "westend",
-    name: "Westend",
-    symbol: "WND",
-    imageUrl:
-      "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/westend.svg",
-  });
-  const [toNetwork, setToNetwork] = useState({
-    id: "wah",
-    name: "Westend Asset Hub",
-    symbol: "WND",
-    imageUrl:
-      "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/westend.svg",
-  });
+  const [fromNetwork, setFromNetwork] = useState(FROM_NETWORKS[0]);
+  const [toNetwork, setToNetwork] = useState(TO_NETWORKS[0]);
   const [selectedToken, setSelectedToken] = useState({
-    symbol: "WND",
-    name: "Westend Token",
+    symbol: FROM_NETWORKS[0].symbol,
+    name: `${FROM_NETWORKS[0].name} Token`,
     price: "$",
-    imageUrl:
-      "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/tokens/dot.svg",
+    chainIconUrl: CHAINS.westendAssetHub.nativeCurrency.tokenUrl,
   });
   const [amount, setAmount] = useState("");
   const [recipientAddress, setRecipientAddress] = useState("");
@@ -73,47 +61,6 @@ export function TokenBridge() {
     },
   });
   const [currentTxHash, setCurrentTxHash] = useState<string | null>(null);
-
-  const fromNetworks = [
-    {
-      id: "westend",
-      name: "Westend",
-      symbol: "WND",
-      imageUrl:
-        "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/westend.svg",
-    },
-    {
-      id: "polkadot",
-      name: "Polkadot",
-      symbol: "DOT",
-      imageUrl:
-        "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/polkadot.svg",
-    },
-    {
-      id: "kusama",
-      name: "Kusama",
-      symbol: "KSM",
-      imageUrl:
-        "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/kusama.svg",
-    },
-  ];
-
-  const toNetworks = [
-    {
-      id: "wah",
-      name: "Westend Asset Hub",
-      symbol: "WND",
-      imageUrl:
-        "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/westend.svg",
-    },
-    {
-      id: "paseoah",
-      name: "Paseo Asset Hub",
-      symbol: "PAS",
-      imageUrl:
-        "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/paseo.svg",
-    },
-  ];
 
   const swapNetworks = () => {
     const currentFromIndex = fromNetworks.findIndex(
@@ -257,7 +204,7 @@ export function TokenBridge() {
                     <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
                         <img
-                          src={fromNetwork.imageUrl}
+                          src={fromNetwork.chainIconUrl}
                           alt={fromNetwork.name}
                           className="w-8 h-8 object-contain"
                           onError={(e) => {
@@ -290,7 +237,7 @@ export function TokenBridge() {
                           className="flex items-center gap-3 p-3 cursor-pointer">
                           <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
                             <img
-                              src={network.imageUrl}
+                              src={network.chainIconUrl}
                               alt={network.name}
                               className="w-8 h-8 object-contain"
                               onError={(e) => {
@@ -327,7 +274,7 @@ export function TokenBridge() {
                 <div className="flex items-center gap-3 cursor-pointer">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
                     <img
-                      src={selectedToken.imageUrl}
+                      src={selectedToken.chainIconUrl}
                       alt={selectedToken.name}
                       className="w-8 h-8 object-contain"
                       onError={(e) => {
@@ -421,7 +368,7 @@ export function TokenBridge() {
                     <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
                         <img
-                          src={toNetwork.imageUrl}
+                          src={toNetwork.chainIconUrl}
                           alt={toNetwork.name}
                           className="w-8 h-8 object-contain"
                           onError={(e) => {
@@ -454,7 +401,7 @@ export function TokenBridge() {
                           className="flex items-center gap-3 p-3 cursor-pointer">
                           <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
                             <img
-                              src={network.imageUrl}
+                              src={network.chainIconUrl}
                               alt={network.name}
                               className="w-8 h-8 object-contain"
                               onError={(e) => {
@@ -491,7 +438,7 @@ export function TokenBridge() {
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
                     <img
-                      src={selectedToken.imageUrl}
+                      src={selectedToken.chainIconUrl}
                       alt={selectedToken.name}
                       className="w-8 h-8 object-contain"
                       onError={(e) => {
