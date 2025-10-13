@@ -1,117 +1,194 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { ArrowUpDown, ChevronDown, Zap, Clock, Copy, Check, ExternalLink, Loader2 } from "lucide-react"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  ArrowUpDown,
+  ChevronDown,
+  Zap,
+  Clock,
+  Copy,
+  Check,
+  ExternalLink,
+  Loader2,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { WalletConnect } from "./WalletConnect"
+} from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { WalletConnect } from "./WalletConnect";
 
 export function TokenBridge() {
-  const [fromNetwork, setFromNetwork] = useState({ id: "westend", name: "Westend", symbol: "WND", imageUrl: "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/westend.svg" })
-  const [toNetwork, setToNetwork] = useState({ id: "wah", name: "Westend Asset Hub", symbol: "WND", imageUrl: "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/westend.svg" })
-  const [selectedToken, setSelectedToken] = useState({ symbol: "WND", name: "Westend Token", price: "$", imageUrl: "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/tokens/dot.svg" })
-  const [amount, setAmount] = useState("")
-  const [recipientAddress, setRecipientAddress] = useState("")
-  const [addressCopied, setAddressCopied] = useState(false)
-  const [accountBalance, setAccountBalance] = useState("0.0000")
-  const [isLoadingBalance, setIsLoadingBalance] = useState(false)
-  const [isBridging, setIsBridging] = useState(false)
-  const [bridgeError, setBridgeError] = useState<string | null>(null)
-  const [evmBalance, setEvmBalance] = useState<string | null>(null)
-  const [isLoadingEvmBalance, setIsLoadingEvmBalance] = useState(false)
-  const [showTransactionDialog, setShowTransactionDialog] = useState(false)
+  const [fromNetwork, setFromNetwork] = useState({
+    id: "westend",
+    name: "Westend",
+    symbol: "WND",
+    imageUrl:
+      "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/westend.svg",
+  });
+  const [toNetwork, setToNetwork] = useState({
+    id: "wah",
+    name: "Westend Asset Hub",
+    symbol: "WND",
+    imageUrl:
+      "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/westend.svg",
+  });
+  const [selectedToken, setSelectedToken] = useState({
+    symbol: "WND",
+    name: "Westend Token",
+    price: "$",
+    imageUrl:
+      "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/tokens/dot.svg",
+  });
+  const [amount, setAmount] = useState("");
+  const [recipientAddress, setRecipientAddress] = useState("");
+  const [addressCopied, setAddressCopied] = useState(false);
+  const [accountBalance, setAccountBalance] = useState("0.0000");
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+  const [isBridging, setIsBridging] = useState(false);
+  const [bridgeError, setBridgeError] = useState<string | null>(null);
+  const [evmBalance, setEvmBalance] = useState<string | null>(null);
+  const [isLoadingEvmBalance, setIsLoadingEvmBalance] = useState(false);
+  const [showTransactionDialog, setShowTransactionDialog] = useState(false);
   const [transactionSteps, setTransactionSteps] = useState({
-    mapAccount: { status: 'pending' as 'pending' | 'active' | 'completed', txHash: null as string | null },
-    call: { status: 'pending' as 'pending' | 'active' | 'completed', txHash: null as string | null }
-  })
-  const [currentTxHash, setCurrentTxHash] = useState<string | null>(null)
+    mapAccount: {
+      status: "pending" as "pending" | "active" | "completed",
+      txHash: null as string | null,
+    },
+    call: {
+      status: "pending" as "pending" | "active" | "completed",
+      txHash: null as string | null,
+    },
+  });
+  const [currentTxHash, setCurrentTxHash] = useState<string | null>(null);
 
   const fromNetworks = [
-    { id: "westend", name: "Westend", symbol: "WND", imageUrl: "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/westend.svg" },
-    { id: "polkadot", name: "Polkadot", symbol: "DOT", imageUrl: "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/polkadot.svg" },
-    { id: "kusama", name: "Kusama", symbol: "KSM", imageUrl: "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/kusama.svg" }
-  ]
+    {
+      id: "westend",
+      name: "Westend",
+      symbol: "WND",
+      imageUrl:
+        "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/westend.svg",
+    },
+    {
+      id: "polkadot",
+      name: "Polkadot",
+      symbol: "DOT",
+      imageUrl:
+        "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/polkadot.svg",
+    },
+    {
+      id: "kusama",
+      name: "Kusama",
+      symbol: "KSM",
+      imageUrl:
+        "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/kusama.svg",
+    },
+  ];
 
   const toNetworks = [
-    { id: "wah", name: "Westend Asset Hub", symbol: "WND", imageUrl: "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/westend.svg" },
-    { id: "paseoah", name: "Paseo Asset Hub", symbol: "PAS", imageUrl: "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/paseo.svg" }
-  ]
+    {
+      id: "wah",
+      name: "Westend Asset Hub",
+      symbol: "WND",
+      imageUrl:
+        "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/westend.svg",
+    },
+    {
+      id: "paseoah",
+      name: "Paseo Asset Hub",
+      symbol: "PAS",
+      imageUrl:
+        "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/paseo.svg",
+    },
+  ];
 
   const swapNetworks = () => {
-    const currentFromIndex = fromNetworks.findIndex(n => n.id === fromNetwork.id)
-    const currentToIndex = toNetworks.findIndex(n => n.id === toNetwork.id)
-    const nextFromIndex = (currentFromIndex + 1) % fromNetworks.length
-    const nextToIndex = (currentToIndex + 1) % toNetworks.length
-    setFromNetwork(fromNetworks[nextFromIndex])
-    setToNetwork(toNetworks[nextToIndex])
-  }
+    const currentFromIndex = fromNetworks.findIndex(
+      (n) => n.id === fromNetwork.id
+    );
+    const currentToIndex = toNetworks.findIndex((n) => n.id === toNetwork.id);
+    const nextFromIndex = (currentFromIndex + 1) % fromNetworks.length;
+    const nextToIndex = (currentToIndex + 1) % toNetworks.length;
+    setFromNetwork(fromNetworks[nextFromIndex]);
+    setToNetwork(toNetworks[nextToIndex]);
+  };
 
-  const handleFromNetworkSelect = (network: typeof fromNetworks[0]) => {
-    setFromNetwork(network)
-  }
+  const handleFromNetworkSelect = (network: (typeof fromNetworks)[0]) => {
+    setFromNetwork(network);
+  };
 
-  const handleToNetworkSelect = (network: typeof toNetworks[0]) => {
-    setToNetwork(network)
-  }
+  const handleToNetworkSelect = (network: (typeof toNetworks)[0]) => {
+    setToNetwork(network);
+  };
 
   const copyAddress = async () => {
     if (recipientAddress) {
-      await navigator.clipboard.writeText(recipientAddress)
-      setAddressCopied(true)
-      setTimeout(() => setAddressCopied(false), 2000)
+      await navigator.clipboard.writeText(recipientAddress);
+      setAddressCopied(true);
+      setTimeout(() => setAddressCopied(false), 2000);
     }
-  }
+  };
 
   const isValidEvmAddress = (address: string) => {
-    return /^0x[a-fA-F0-9]{40}$/.test(address)
-  }
+    return /^0x[a-fA-F0-9]{40}$/.test(address);
+  };
 
   const bridgeTokens = async () => {
-    setIsBridging(true)
-    setBridgeError(null)
-    setShowTransactionDialog(true)
+    setIsBridging(true);
+    setBridgeError(null);
+    setShowTransactionDialog(true);
     setTransactionSteps({
-      mapAccount: { status: 'pending', txHash: null },
-      call: { status: 'pending', txHash: null }
-    })
-    setCurrentTxHash(null)
+      mapAccount: { status: "pending", txHash: null },
+      call: { status: "pending", txHash: null },
+    });
+    setCurrentTxHash(null);
 
     // Simulate transaction steps
     setTimeout(() => {
-      setTransactionSteps(prev => ({ ...prev, mapAccount: { status: 'active', txHash: null } }))
-    }, 1000)
+      setTransactionSteps((prev) => ({
+        ...prev,
+        mapAccount: { status: "active", txHash: null },
+      }));
+    }, 1000);
 
     setTimeout(() => {
-      setTransactionSteps(prev => ({ ...prev, mapAccount: { status: 'completed', txHash: '0x1234...' } }))
-      setCurrentTxHash('0x1234...')
-    }, 3000)
+      setTransactionSteps((prev) => ({
+        ...prev,
+        mapAccount: { status: "completed", txHash: "0x1234..." },
+      }));
+      setCurrentTxHash("0x1234...");
+    }, 3000);
 
     setTimeout(() => {
-      setTransactionSteps(prev => ({ ...prev, call: { status: 'active', txHash: null } }))
-    }, 4000)
+      setTransactionSteps((prev) => ({
+        ...prev,
+        call: { status: "active", txHash: null },
+      }));
+    }, 4000);
 
     setTimeout(() => {
-      setTransactionSteps(prev => ({ ...prev, call: { status: 'completed', txHash: '0x5678...' } }))
-      setCurrentTxHash('0x5678...')
-      setShowTransactionDialog(false)
-      setIsBridging(false)
-    }, 6000)
-  }
+      setTransactionSteps((prev) => ({
+        ...prev,
+        call: { status: "completed", txHash: "0x5678..." },
+      }));
+      setCurrentTxHash("0x5678...");
+      setShowTransactionDialog(false);
+      setIsBridging(false);
+    }, 6000);
+  };
 
   return (
     <div className="min-h-screen network-grid">
@@ -132,9 +209,11 @@ export function TokenBridge() {
       </header>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="mx-auto px-4 py-8 max-w-2xl">
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold mb-3 text-balance">Bridge Your Tokens to PolkaVM Asset Hub</h2>
+          <h2 className="text-3xl font-bold mb-3 text-balance">
+            Bridge Your Tokens to PolkaVM Asset Hub
+          </h2>
           <p className="text-muted-foreground text-pretty">
             Convert native tokens to PolkaVM Asset Hub tokens seamlessly
           </p>
@@ -144,14 +223,15 @@ export function TokenBridge() {
         {bridgeError && (
           <Card className="p-4 mb-6 bg-red-50 border-red-200">
             <div className="text-sm">
-              <div className="font-medium text-red-800 mb-2">❌ Bridge Transaction Failed</div>
+              <div className="font-medium text-red-800 mb-2">
+                ❌ Bridge Transaction Failed
+              </div>
               <div className="text-red-700">{bridgeError}</div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setBridgeError(null)}
-                className="mt-2 text-red-600 hover:text-red-800"
-              >
+                className="mt-2 text-red-600 hover:text-red-800">
                 Dismiss
               </Button>
             </div>
@@ -166,7 +246,7 @@ export function TokenBridge() {
               <label className="text-sm font-medium">From</label>
               <Badge variant="outline" className="text-xs">
                 <Clock className="w-3 h-3 mr-1" />
-                ~6s 
+                ~6s
               </Badge>
             </div>
 
@@ -176,15 +256,16 @@ export function TokenBridge() {
                   <DropdownMenuTrigger asChild>
                     <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                        <img 
-                          src={fromNetwork.imageUrl} 
+                        <img
+                          src={fromNetwork.imageUrl}
                           alt={fromNetwork.name}
                           className="w-8 h-8 object-contain"
                           onError={(e) => {
-                            const target = e.currentTarget as HTMLImageElement
-                            target.style.display = 'none'
-                            const nextElement = target.nextElementSibling as HTMLElement
-                            if (nextElement) nextElement.style.display = 'flex'
+                            const target = e.currentTarget as HTMLImageElement;
+                            target.style.display = "none";
+                            const nextElement =
+                              target.nextElementSibling as HTMLElement;
+                            if (nextElement) nextElement.style.display = "flex";
                           }}
                         />
                         <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
@@ -193,7 +274,9 @@ export function TokenBridge() {
                       </div>
                       <div className="flex-1">
                         <div className="font-medium">{fromNetwork.name}</div>
-                        <div className="text-xs text-muted-foreground">{fromNetwork.symbol}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {fromNetwork.symbol}
+                        </div>
                       </div>
                       <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     </div>
@@ -204,18 +287,20 @@ export function TokenBridge() {
                         <DropdownMenuItem
                           key={network.id}
                           onClick={() => handleFromNetworkSelect(network)}
-                          className="flex items-center gap-3 p-3 cursor-pointer"
-                        >
+                          className="flex items-center gap-3 p-3 cursor-pointer">
                           <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                            <img 
-                              src={network.imageUrl} 
+                            <img
+                              src={network.imageUrl}
                               alt={network.name}
                               className="w-8 h-8 object-contain"
                               onError={(e) => {
-                                const target = e.currentTarget as HTMLImageElement
-                                target.style.display = 'none'
-                                const nextElement = target.nextElementSibling as HTMLElement
-                                if (nextElement) nextElement.style.display = 'flex'
+                                const target =
+                                  e.currentTarget as HTMLImageElement;
+                                target.style.display = "none";
+                                const nextElement =
+                                  target.nextElementSibling as HTMLElement;
+                                if (nextElement)
+                                  nextElement.style.display = "flex";
                               }}
                             />
                             <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
@@ -224,7 +309,9 @@ export function TokenBridge() {
                           </div>
                           <div className="flex-1">
                             <div className="font-medium">{network.name}</div>
-                            <div className="text-xs text-muted-foreground">{network.symbol}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {network.symbol}
+                            </div>
                           </div>
                           {network.id === fromNetwork.id && (
                             <Check className="w-4 h-4 text-primary" />
@@ -239,15 +326,16 @@ export function TokenBridge() {
               <Card className="p-4 bg-secondary/50 border-border/50">
                 <div className="flex items-center gap-3 cursor-pointer">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                    <img 
-                      src={selectedToken.imageUrl} 
+                    <img
+                      src={selectedToken.imageUrl}
                       alt={selectedToken.name}
                       className="w-8 h-8 object-contain"
                       onError={(e) => {
-                        const target = e.currentTarget as HTMLImageElement
-                        target.style.display = 'none'
-                        const nextElement = target.nextElementSibling as HTMLElement
-                        if (nextElement) nextElement.style.display = 'flex'
+                        const target = e.currentTarget as HTMLImageElement;
+                        target.style.display = "none";
+                        const nextElement =
+                          target.nextElementSibling as HTMLElement;
+                        if (nextElement) nextElement.style.display = "flex";
                       }}
                     />
                     <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold hidden">
@@ -256,7 +344,9 @@ export function TokenBridge() {
                   </div>
                   <div className="flex-1">
                     <div className="font-medium">{selectedToken.symbol}</div>
-                    <div className="text-xs text-muted-foreground">{selectedToken.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {selectedToken.name}
+                    </div>
                   </div>
                   <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 </div>
@@ -278,8 +368,7 @@ export function TokenBridge() {
                 size="sm"
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80"
                 onClick={() => setAmount(accountBalance)}
-                disabled={isLoadingBalance || accountBalance === "0.0000"}
-              >
+                disabled={isLoadingBalance || accountBalance === "0.0000"}>
                 MAX
               </Button>
             </div>
@@ -287,15 +376,17 @@ export function TokenBridge() {
             <div className="flex justify-between text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <span>
-                  Balance: {isLoadingBalance ? "Loading..." : `${accountBalance} ${fromNetwork.symbol}`}
+                  Balance:{" "}
+                  {isLoadingBalance
+                    ? "Loading..."
+                    : `${accountBalance} ${fromNetwork.symbol}`}
                 </span>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {}}
                   disabled={isLoadingBalance}
-                  className="h-6 px-2 text-xs"
-                >
+                  className="h-6 px-2 text-xs">
                   🔄
                 </Button>
               </div>
@@ -309,8 +400,7 @@ export function TokenBridge() {
               variant="outline"
               size="icon"
               onClick={swapNetworks}
-              className="rounded-full border-border/50 hover:bg-secondary/50 hover:border-primary/50 bg-transparent"
-            >
+              className="rounded-full border-border/50 hover:bg-secondary/50 hover:border-primary/50 bg-transparent">
               <ArrowUpDown className="w-4 h-4" />
             </Button>
           </div>
@@ -330,15 +420,16 @@ export function TokenBridge() {
                   <DropdownMenuTrigger asChild>
                     <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                        <img 
-                          src={toNetwork.imageUrl} 
+                        <img
+                          src={toNetwork.imageUrl}
                           alt={toNetwork.name}
                           className="w-8 h-8 object-contain"
                           onError={(e) => {
-                            const target = e.currentTarget as HTMLImageElement
-                            target.style.display = 'none'
-                            const nextElement = target.nextElementSibling as HTMLElement
-                            if (nextElement) nextElement.style.display = 'flex'
+                            const target = e.currentTarget as HTMLImageElement;
+                            target.style.display = "none";
+                            const nextElement =
+                              target.nextElementSibling as HTMLElement;
+                            if (nextElement) nextElement.style.display = "flex";
                           }}
                         />
                         <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
@@ -347,7 +438,9 @@ export function TokenBridge() {
                       </div>
                       <div className="flex-1">
                         <div className="font-medium">{toNetwork.name}</div>
-                        <div className="text-xs text-muted-foreground">{toNetwork.symbol}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {toNetwork.symbol}
+                        </div>
                       </div>
                       <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     </div>
@@ -358,18 +451,20 @@ export function TokenBridge() {
                         <DropdownMenuItem
                           key={network.id}
                           onClick={() => handleToNetworkSelect(network)}
-                          className="flex items-center gap-3 p-3 cursor-pointer"
-                        >
+                          className="flex items-center gap-3 p-3 cursor-pointer">
                           <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                            <img 
-                              src={network.imageUrl} 
+                            <img
+                              src={network.imageUrl}
                               alt={network.name}
                               className="w-8 h-8 object-contain"
                               onError={(e) => {
-                                const target = e.currentTarget as HTMLImageElement
-                                target.style.display = 'none'
-                                const nextElement = target.nextElementSibling as HTMLElement
-                                if (nextElement) nextElement.style.display = 'flex'
+                                const target =
+                                  e.currentTarget as HTMLImageElement;
+                                target.style.display = "none";
+                                const nextElement =
+                                  target.nextElementSibling as HTMLElement;
+                                if (nextElement)
+                                  nextElement.style.display = "flex";
                               }}
                             />
                             <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
@@ -378,7 +473,9 @@ export function TokenBridge() {
                           </div>
                           <div className="flex-1">
                             <div className="font-medium">{network.name}</div>
-                            <div className="text-xs text-muted-foreground">{network.symbol}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {network.symbol}
+                            </div>
                           </div>
                           {network.id === toNetwork.id && (
                             <Check className="w-4 h-4 text-primary" />
@@ -393,15 +490,16 @@ export function TokenBridge() {
               <Card className="p-4 bg-secondary/50 border-border/50">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                    <img 
-                      src={selectedToken.imageUrl} 
+                    <img
+                      src={selectedToken.imageUrl}
                       alt={selectedToken.name}
                       className="w-8 h-8 object-contain"
                       onError={(e) => {
-                        const target = e.currentTarget as HTMLImageElement
-                        target.style.display = 'none'
-                        const nextElement = target.nextElementSibling as HTMLElement
-                        if (nextElement) nextElement.style.display = 'flex'
+                        const target = e.currentTarget as HTMLImageElement;
+                        target.style.display = "none";
+                        const nextElement =
+                          target.nextElementSibling as HTMLElement;
+                        if (nextElement) nextElement.style.display = "flex";
                       }}
                     />
                     <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold hidden">
@@ -410,16 +508,21 @@ export function TokenBridge() {
                   </div>
                   <div className="flex-1">
                     <div className="font-medium">{selectedToken.symbol}</div>
-                    <div className="text-xs text-muted-foreground">PolkaVM {selectedToken.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      PolkaVM {selectedToken.name}
+                    </div>
                   </div>
                 </div>
               </Card>
             </div>
 
             <Card className="p-4 bg-secondary/30 border-border/50">
-              <div className="text-2xl font-mono text-muted-foreground">{amount || "0.0"}</div>
+              <div className="text-2xl font-mono text-muted-foreground">
+                {amount || "0.0"}
+              </div>
               <div className="text-sm text-muted-foreground mt-1">
-                You will receive ≈ {amount || "0.0"} PolkaVM {selectedToken.symbol}
+                You will receive ≈ {amount || "0.0"} PolkaVM{" "}
+                {selectedToken.symbol}
               </div>
             </Card>
           </div>
@@ -439,11 +542,12 @@ export function TokenBridge() {
                 placeholder="Your EVM address here"
                 value={recipientAddress}
                 onChange={(e) => setRecipientAddress(e.target.value)}
-                className={`pr-12 ${recipientAddress && !isValidEvmAddress(recipientAddress)
+                className={`pr-12 ${
+                  recipientAddress && !isValidEvmAddress(recipientAddress)
                     ? "border-red-500 focus:border-red-500"
                     : recipientAddress && isValidEvmAddress(recipientAddress)
-                      ? "border-green-500 focus:border-green-500"
-                      : ""
+                    ? "border-green-500 focus:border-green-500"
+                    : ""
                 }`}
               />
               {recipientAddress && (
@@ -451,8 +555,7 @@ export function TokenBridge() {
                   variant="ghost"
                   size="icon"
                   className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                  onClick={copyAddress}
-                >
+                  onClick={copyAddress}>
                   {addressCopied ? (
                     <Check className="w-4 h-4 text-green-500" />
                   ) : (
@@ -463,7 +566,9 @@ export function TokenBridge() {
             </div>
 
             {recipientAddress && !isValidEvmAddress(recipientAddress) && (
-              <p className="text-sm text-red-500">Please enter a valid EVM address (0x...)</p>
+              <p className="text-sm text-red-500">
+                Please enter a valid EVM address (0x...)
+              </p>
             )}
 
             {/* EVM Balance Display */}
@@ -473,43 +578,56 @@ export function TokenBridge() {
                 {isLoadingEvmBalance ? (
                   <span>Loading...</span>
                 ) : (
-                  <span className="font-medium text-primary">{evmBalance} {toNetwork.symbol}</span>
+                  <span className="font-medium text-primary">
+                    {evmBalance} {toNetwork.symbol}
+                  </span>
                 )}
               </div>
             )}
 
             <p className="text-xs text-muted-foreground">
-              Enter the PolkaVM address where you want to receive your tokens. Make sure you control this address.
+              Enter the PolkaVM address where you want to receive your tokens.
+              Make sure you control this address.
             </p>
           </div>
 
           {/* Bridge Button */}
           <Button
             className="w-full h-12 text-lg font-semibold bg-primary hover:bg-primary/90 glow-effect"
-            disabled={!amount || !recipientAddress || !isValidEvmAddress(recipientAddress) || isBridging}
-            onClick={bridgeTokens}
-          >
+            disabled={
+              !amount ||
+              !recipientAddress ||
+              !isValidEvmAddress(recipientAddress) ||
+              isBridging
+            }
+            onClick={bridgeTokens}>
             {isBridging
               ? "🔄 Bridging..."
               : !recipientAddress
-                ? "Enter Recipient Address"
-                : !isValidEvmAddress(recipientAddress)
-                  ? "Invalid EVM Address"
-                    : !amount
-                      ? "Enter Amount"
-                      : `Bridge ${amount} ${selectedToken.symbol}`}
+              ? "Enter Recipient Address"
+              : !isValidEvmAddress(recipientAddress)
+              ? "Invalid EVM Address"
+              : !amount
+              ? "Enter Amount"
+              : `Bridge ${amount} ${selectedToken.symbol}`}
           </Button>
         </Card>
       </div>
 
       {/* Transaction Progress Dialog */}
-      <Dialog open={showTransactionDialog} onOpenChange={setShowTransactionDialog}>
+      <Dialog
+        open={showTransactionDialog}
+        onOpenChange={setShowTransactionDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-blue-600">Transaction Progress</DialogTitle>
-            <p className="text-sm text-muted-foreground">Bridging tokens to PolkaVM...</p>
+            <DialogTitle className="text-lg font-bold text-blue-600">
+              Transaction Progress
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Bridging tokens to PolkaVM...
+            </p>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             {/* Current Transaction Hash */}
             {currentTxHash && (
@@ -533,65 +651,82 @@ export function TokenBridge() {
             <div className="space-y-3">
               {/* Map Account Step */}
               <div className="flex items-center gap-3">
-                {transactionSteps.mapAccount.status === 'completed' ? (
+                {transactionSteps.mapAccount.status === "completed" ? (
                   <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
                     <Check className="h-4 w-4 text-white" />
                   </div>
-                ) : transactionSteps.mapAccount.status === 'active' ? (
+                ) : transactionSteps.mapAccount.status === "active" ? (
                   <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
                     <Loader2 className="h-4 w-4 text-white animate-spin" />
                   </div>
                 ) : (
                   <div className="w-6 h-6 rounded-full border-2 border-gray-300" />
                 )}
-                <span className={`text-sm ${transactionSteps.mapAccount.status === 'active' ? 'text-blue-600 font-medium' : transactionSteps.mapAccount.status === 'completed' ? 'text-green-600' : 'text-gray-500'}`}>
+                <span
+                  className={`text-sm ${
+                    transactionSteps.mapAccount.status === "active"
+                      ? "text-blue-600 font-medium"
+                      : transactionSteps.mapAccount.status === "completed"
+                      ? "text-green-600"
+                      : "text-gray-500"
+                  }`}>
                   Map Account
                 </span>
               </div>
 
               {/* Call Step */}
               <div className="flex items-center gap-3">
-                {transactionSteps.call.status === 'completed' ? (
+                {transactionSteps.call.status === "completed" ? (
                   <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
                     <Check className="h-4 w-4 text-white" />
                   </div>
-                ) : transactionSteps.call.status === 'active' ? (
+                ) : transactionSteps.call.status === "active" ? (
                   <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
                     <Loader2 className="h-4 w-4 text-white animate-spin" />
                   </div>
                 ) : (
                   <div className="w-6 h-6 rounded-full border-2 border-gray-300" />
                 )}
-                <span className={`text-sm ${transactionSteps.call.status === 'active' ? 'text-blue-600 font-medium' : transactionSteps.call.status === 'completed' ? 'text-green-600' : 'text-gray-500'}`}>
+                <span
+                  className={`text-sm ${
+                    transactionSteps.call.status === "active"
+                      ? "text-blue-600 font-medium"
+                      : transactionSteps.call.status === "completed"
+                      ? "text-green-600"
+                      : "text-gray-500"
+                  }`}>
                   Bridge Call
                 </span>
               </div>
             </div>
 
             {/* Status Message */}
-            {transactionSteps.mapAccount.status === 'active' && (
+            {transactionSteps.mapAccount.status === "active" && (
               <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                 <Loader2 className="h-4 w-4 text-yellow-600 animate-spin" />
-                <span className="text-sm text-yellow-800">Waiting for confirmation...</span>
+                <span className="text-sm text-yellow-800">
+                  Waiting for confirmation...
+                </span>
               </div>
             )}
-            {transactionSteps.call.status === 'active' && (
+            {transactionSteps.call.status === "active" && (
               <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                 <Loader2 className="h-4 w-4 text-yellow-600 animate-spin" />
-                <span className="text-sm text-yellow-800">Waiting for confirmation...</span>
+                <span className="text-sm text-yellow-800">
+                  Waiting for confirmation...
+                </span>
               </div>
             )}
 
             {/* Processing Button */}
-            <Button 
+            <Button
               className="w-full bg-pink-500 hover:bg-pink-600 text-white"
-              disabled
-            >
+              disabled>
               Processing...
             </Button>
           </div>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
