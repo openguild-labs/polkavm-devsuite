@@ -3,6 +3,9 @@ import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Toaster } from '@/components/ui/sonner'
 import { ChainInitNotification } from '@/components/features/ChainInitNotification'
+import Providers from './Providers'
+import '@luno-kit/ui/styles.css';
+
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -19,9 +22,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
+        <Providers>
           <ChainInitNotification />
           {children}
           <Toaster />
+        </Providers>
       </body>
     </html>
   )

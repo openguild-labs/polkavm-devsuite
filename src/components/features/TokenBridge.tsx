@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { ArrowUpDown, Wallet, ChevronDown, Zap, Clock, Copy, Check, ExternalLink, Loader2 } from "lucide-react"
+import { ArrowUpDown, ChevronDown, Zap, Clock, Copy, Check, ExternalLink, Loader2 } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { WalletConnect } from "./WalletConnect"
 
 export function TokenBridge() {
   const [fromNetwork, setFromNetwork] = useState({ id: "westend", name: "Westend", symbol: "WND", imageUrl: "https://raw.githubusercontent.com/TalismanSociety/chaindata/main/assets/chains/westend.svg" })
@@ -125,10 +126,7 @@ export function TokenBridge() {
           </div>
 
           <div className="flex items-center gap-4">
-            <Button className="flex items-center gap-2">
-              <Wallet className="w-4 h-4" />
-              Connect Wallet
-            </Button>
+            <WalletConnect />
           </div>
         </div>
       </header>
