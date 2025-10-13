@@ -183,8 +183,10 @@ export function TokenBridge() {
                           alt={fromNetwork.name}
                           className="w-8 h-8 object-contain"
                           onError={(e) => {
-                            e.currentTarget.style.display = 'none'
-                            e.currentTarget.nextElementSibling!.style.display = 'flex'
+                            const target = e.currentTarget as HTMLImageElement
+                            target.style.display = 'none'
+                            const nextElement = target.nextElementSibling as HTMLElement
+                            if (nextElement) nextElement.style.display = 'flex'
                           }}
                         />
                         <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
@@ -212,8 +214,10 @@ export function TokenBridge() {
                               alt={network.name}
                               className="w-8 h-8 object-contain"
                               onError={(e) => {
-                                e.currentTarget.style.display = 'none'
-                                e.currentTarget.nextElementSibling!.style.display = 'flex'
+                                const target = e.currentTarget as HTMLImageElement
+                                target.style.display = 'none'
+                                const nextElement = target.nextElementSibling as HTMLElement
+                                if (nextElement) nextElement.style.display = 'flex'
                               }}
                             />
                             <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
@@ -242,8 +246,10 @@ export function TokenBridge() {
                       alt={selectedToken.name}
                       className="w-8 h-8 object-contain"
                       onError={(e) => {
-                        e.currentTarget.style.display = 'none'
-                        e.currentTarget.nextElementSibling!.style.display = 'flex'
+                        const target = e.currentTarget as HTMLImageElement
+                        target.style.display = 'none'
+                        const nextElement = target.nextElementSibling as HTMLElement
+                        if (nextElement) nextElement.style.display = 'flex'
                       }}
                     />
                     <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold hidden">
@@ -331,8 +337,10 @@ export function TokenBridge() {
                           alt={toNetwork.name}
                           className="w-8 h-8 object-contain"
                           onError={(e) => {
-                            e.currentTarget.style.display = 'none'
-                            e.currentTarget.nextElementSibling!.style.display = 'flex'
+                            const target = e.currentTarget as HTMLImageElement
+                            target.style.display = 'none'
+                            const nextElement = target.nextElementSibling as HTMLElement
+                            if (nextElement) nextElement.style.display = 'flex'
                           }}
                         />
                         <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
@@ -360,8 +368,10 @@ export function TokenBridge() {
                               alt={network.name}
                               className="w-8 h-8 object-contain"
                               onError={(e) => {
-                                e.currentTarget.style.display = 'none'
-                                e.currentTarget.nextElementSibling!.style.display = 'flex'
+                                const target = e.currentTarget as HTMLImageElement
+                                target.style.display = 'none'
+                                const nextElement = target.nextElementSibling as HTMLElement
+                                if (nextElement) nextElement.style.display = 'flex'
                               }}
                             />
                             <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
@@ -390,8 +400,10 @@ export function TokenBridge() {
                       alt={selectedToken.name}
                       className="w-8 h-8 object-contain"
                       onError={(e) => {
-                        e.currentTarget.style.display = 'none'
-                        e.currentTarget.nextElementSibling!.style.display = 'flex'
+                        const target = e.currentTarget as HTMLImageElement
+                        target.style.display = 'none'
+                        const nextElement = target.nextElementSibling as HTMLElement
+                        if (nextElement) nextElement.style.display = 'flex'
                       }}
                     />
                     <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold hidden">
