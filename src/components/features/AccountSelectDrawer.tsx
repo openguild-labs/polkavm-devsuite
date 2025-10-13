@@ -12,8 +12,8 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer"
 import { Wallet, Copy, Check } from "lucide-react"
-import type { InjectedPolkadotAccount, SignPayload, SignRaw } from "@/features/wallet-connect/pjs-signer/types"
-import { detectPolkadotWallets, externalWallets, type WalletInfo } from "@/lib/wallet-detection"
+import type { InjectedPolkadotAccount, SignPayload, SignRaw } from "@/components/features/wallet-connect/pjs-signer/types"
+import { detectPolkadotWallets, externalWallets, type WalletInfo } from "@/lib/walletDetection"
 import { chainClient$, selectedChain$ } from "@/lib/chain"
 import { supportedChains, type SupportedChain } from "@/lib/chains"
 import { useStateObservable } from "@react-rxjs/core"
@@ -176,7 +176,7 @@ export function AccountSelectDrawer({
         
          // Convert to InjectedPolkadotAccount format with proper signers
          const { web3FromSource } = await import('@polkadot/extension-dapp')
-         const { getPolkadotSignerFromPjs } = await import('@/features/wallet-connect/pjs-signer/from-pjs-account')
+         const { getPolkadotSignerFromPjs } = await import('@/components/features/wallet-connect/pjs-signer/from-pjs-account')
          
          const polkadotAccounts = (await Promise.all(accounts.map(async (account: any) => {
            // Get signer for each account and convert to polkadot-api compatible format
@@ -239,7 +239,7 @@ export function AccountSelectDrawer({
       }
       
       try {
-        const { wcAccounts$ } = await import('@/features/wallet-connect/accounts.state')
+        const { wcAccounts$ } = await import('@/components/features/wallet-connect/accounts.state')
         subscription = wcAccounts$.subscribe((accounts) => {
           setWalletConnectAccounts(accounts)
         })
@@ -329,7 +329,7 @@ export function AccountSelectDrawer({
 
         let polkadotApiSigner = null
         if (pjsSigner && pjsSigner.signPayload && pjsSigner.signRaw) {
-          const { getPolkadotSignerFromPjs } = await import('@/features/wallet-connect/pjs-signer/from-pjs-account')
+          const { getPolkadotSignerFromPjs } = await import('@/components/features/wallet-connect/pjs-signer/from-pjs-account')
           polkadotApiSigner = getPolkadotSignerFromPjs(
             account.address,
             pjsSigner.signPayload.bind(pjsSigner) as SignPayload,
@@ -374,7 +374,7 @@ export function AccountSelectDrawer({
     setIsConnecting(wallet.id)
     try {
       if (wallet.id === 'wallet-connect') {
-        const { walletConnect } = await import('@/features/wallet-connect')
+        const { walletConnect } = await import('@/components/features/wallet-connect')
         await walletConnect.connect()
       }
     } catch (error) {
@@ -538,7 +538,7 @@ export function AccountSelectDrawer({
                         const { web3FromSource } = await import('@polkadot/extension-dapp')
                         const injector = await web3FromSource(account.walletId)
                         if (injector.signer && injector.signer.signPayload && injector.signer.signRaw) {
-                          const { getPolkadotSignerFromPjs } = await import('@/features/wallet-connect/pjs-signer/from-pjs-account')
+                          const { getPolkadotSignerFromPjs } = await import('@/components/features/wallet-connect/pjs-signer/from-pjs-account')
                           const polkadotApiSigner = getPolkadotSignerFromPjs(
                             account.address,
                             injector.signer.signPayload.bind(injector.signer) as SignPayload,
