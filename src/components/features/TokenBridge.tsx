@@ -88,6 +88,13 @@ export function TokenBridge() {
     if (correspondingToNetwork) {
       setToNetwork(correspondingToNetwork);
     }
+    
+    setSelectedToken({
+      symbol: nextFromNetwork.symbol,
+      name: `${nextFromNetwork.name} Token`,
+      price: "$",
+      chainIconUrl: CHAINS[nextFromNetwork.id as keyof typeof CHAINS]?.nativeCurrency.tokenUrl || nextFromNetwork.chainIconUrl,
+    });
   };
 
   const handleFromNetworkSelect = (network: typeof FROM_NETWORKS[0]) => {
@@ -103,10 +110,34 @@ export function TokenBridge() {
     if (correspondingToNetwork) {
       setToNetwork(correspondingToNetwork);
     }
+    
+    setSelectedToken({
+      symbol: network.symbol,
+      name: `${network.name} Token`,
+      price: "$",
+      chainIconUrl: CHAINS[network.id as keyof typeof CHAINS]?.nativeCurrency.tokenUrl || network.chainIconUrl,
+    });
   };
 
   const handleToNetworkSelect = (network: typeof TO_NETWORKS[0]) => {
     setToNetwork(network);
+    
+    const correspondingFromNetwork = FROM_NETWORKS.find(fromNetwork => {
+      if (network.id === 'passet') return fromNetwork.id === 'paseoPassetHub';
+      if (network.id === 'wah') return fromNetwork.id === 'westendAssetHub';
+      if (network.id === 'kah') return fromNetwork.id === 'kusamaAssetHub';
+      return false;
+    });
+    
+    if (correspondingFromNetwork) {
+      setFromNetwork(correspondingFromNetwork);
+      setSelectedToken({
+        symbol: correspondingFromNetwork.symbol,
+        name: `${correspondingFromNetwork.name} Token`,
+        price: "$",
+        chainIconUrl: CHAINS[correspondingFromNetwork.id as keyof typeof CHAINS]?.nativeCurrency.tokenUrl || correspondingFromNetwork.chainIconUrl,
+      });
+    }
   };
 
   const copyAddress = async () => {
