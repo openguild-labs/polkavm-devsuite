@@ -29,7 +29,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { WalletConnect } from "./WalletConnect";
-import { FROM_NETWORKS, TO_NETWORKS, CHAINS, POLKAVM_CHAINS, type SupportedChain, type SupportedPolkaVMChain } from "@/constants";
+import {
+  FROM_NETWORKS,
+  TO_NETWORKS,
+  CHAINS,
+  POLKAVM_CHAINS,
+  type SupportedChain,
+  type SupportedPolkaVMChain,
+} from "@/constants";
 import { usePapiClient } from "@/hooks/usePapiClient";
 import { useAccount } from "@luno-kit/react";
 import { ethers } from "ethers";
@@ -37,14 +44,25 @@ import { useEffect } from "react";
 
 export function TokenBridge() {
   const { address } = useAccount();
-  const { balance, loadingBalance, refreshBalance, switchChain, isReady, mapAccount, depositAccount } = usePapiClient();
-  
+  const {
+    balance,
+    loadingBalance,
+    refreshBalance,
+    switchChain,
+    isReady,
+    mapAccount,
+    depositAccount,
+  } = usePapiClient();
+
   const [fromNetwork, setFromNetwork] = useState(FROM_NETWORKS[0]);
   const [toNetwork, setToNetwork] = useState(() => {
-    const correspondingToNetwork = TO_NETWORKS.find(toNetwork => {
-      if (FROM_NETWORKS[0].id === 'paseoPassetHub') return toNetwork.id === 'passet';
-      if (FROM_NETWORKS[0].id === 'westendAssetHub') return toNetwork.id === 'wah';
-      if (FROM_NETWORKS[0].id === 'kusamaAssetHub') return toNetwork.id === 'kah';
+    const correspondingToNetwork = TO_NETWORKS.find((toNetwork) => {
+      if (FROM_NETWORKS[0].id === "paseoPassetHub")
+        return toNetwork.id === "passet";
+      if (FROM_NETWORKS[0].id === "westendAssetHub")
+        return toNetwork.id === "wah";
+      if (FROM_NETWORKS[0].id === "kusamaAssetHub")
+        return toNetwork.id === "kah";
       return false;
     });
     return correspondingToNetwork || TO_NETWORKS[0];
@@ -81,74 +99,83 @@ export function TokenBridge() {
     );
     const nextFromIndex = (currentFromIndex + 1) % FROM_NETWORKS.length;
     const nextFromNetwork = FROM_NETWORKS[nextFromIndex];
-    
-    const correspondingToNetwork = TO_NETWORKS.find(toNetwork => {
-      if (nextFromNetwork.id === 'paseoPassetHub') return toNetwork.id === 'passet';
-      if (nextFromNetwork.id === 'westendAssetHub') return toNetwork.id === 'wah';
-      if (nextFromNetwork.id === 'kusamaAssetHub') return toNetwork.id === 'kah';
+
+    const correspondingToNetwork = TO_NETWORKS.find((toNetwork) => {
+      if (nextFromNetwork.id === "paseoPassetHub")
+        return toNetwork.id === "passet";
+      if (nextFromNetwork.id === "westendAssetHub")
+        return toNetwork.id === "wah";
+      if (nextFromNetwork.id === "kusamaAssetHub")
+        return toNetwork.id === "kah";
       return false;
     });
-    
+
     setFromNetwork(nextFromNetwork);
     if (correspondingToNetwork) {
       setToNetwork(correspondingToNetwork);
     }
-    
+
     setSelectedToken({
       symbol: nextFromNetwork.symbol,
       name: `${nextFromNetwork.name} Token`,
       price: "$",
-      chainIconUrl: CHAINS[nextFromNetwork.id as keyof typeof CHAINS]?.nativeCurrency.tokenUrl || nextFromNetwork.chainIconUrl,
+      chainIconUrl:
+        CHAINS[nextFromNetwork.id as keyof typeof CHAINS]?.nativeCurrency
+          .tokenUrl || nextFromNetwork.chainIconUrl,
     });
-    
+
     if (address) {
       switchChain(nextFromNetwork.id);
     }
   };
 
-  const handleFromNetworkSelect = (network: typeof FROM_NETWORKS[0]) => {
+  const handleFromNetworkSelect = (network: (typeof FROM_NETWORKS)[0]) => {
     setFromNetwork(network);
-    
-    const correspondingToNetwork = TO_NETWORKS.find(toNetwork => {
-      if (network.id === 'paseoPassetHub') return toNetwork.id === 'passet';
-      if (network.id === 'westendAssetHub') return toNetwork.id === 'wah';
-      if (network.id === 'kusamaAssetHub') return toNetwork.id === 'kah';
+
+    const correspondingToNetwork = TO_NETWORKS.find((toNetwork) => {
+      if (network.id === "paseoPassetHub") return toNetwork.id === "passet";
+      if (network.id === "westendAssetHub") return toNetwork.id === "wah";
+      if (network.id === "kusamaAssetHub") return toNetwork.id === "kah";
       return false;
     });
-    
+
     if (correspondingToNetwork) {
       setToNetwork(correspondingToNetwork);
     }
-    
+
     setSelectedToken({
       symbol: network.symbol,
       name: `${network.name} Token`,
       price: "$",
-      chainIconUrl: CHAINS[network.id as keyof typeof CHAINS]?.nativeCurrency.tokenUrl || network.chainIconUrl,
+      chainIconUrl:
+        CHAINS[network.id as keyof typeof CHAINS]?.nativeCurrency.tokenUrl ||
+        network.chainIconUrl,
     });
-    
+
     if (address) {
       switchChain(network.id);
     }
   };
 
-  const handleToNetworkSelect = (network: typeof TO_NETWORKS[0]) => {
+  const handleToNetworkSelect = (network: (typeof TO_NETWORKS)[0]) => {
     setToNetwork(network);
-    
-    const correspondingFromNetwork = FROM_NETWORKS.find(fromNetwork => {
-      if (network.id === 'passet') return fromNetwork.id === 'paseoPassetHub';
-      if (network.id === 'wah') return fromNetwork.id === 'westendAssetHub';
-      if (network.id === 'kah') return fromNetwork.id === 'kusamaAssetHub';
+
+    const correspondingFromNetwork = FROM_NETWORKS.find((fromNetwork) => {
+      if (network.id === "passet") return fromNetwork.id === "paseoPassetHub";
+      if (network.id === "wah") return fromNetwork.id === "westendAssetHub";
+      if (network.id === "kah") return fromNetwork.id === "kusamaAssetHub";
       return false;
     });
-    
+
     if (correspondingFromNetwork) {
       setFromNetwork(correspondingFromNetwork);
       setSelectedToken({
         symbol: correspondingFromNetwork.symbol,
         name: `${correspondingFromNetwork.name} Token`,
         price: "$",
-        chainIconUrl: CHAINS[correspondingFromNetwork.id as keyof typeof CHAINS]?.nativeCurrency.tokenUrl || correspondingFromNetwork.chainIconUrl,
+        chainIconUrl:
+          CHAINS[correspondingFromNetwork.id as keyof typeof CHAINS]
+            ?.nativeCurrency.tokenUrl || correspondingFromNetwork.chainIconUrl,
       });
     }
   };
@@ -167,19 +194,20 @@ export function TokenBridge() {
 
   const fetchEvmBalance = async (address: string, toNetworkId: string) => {
     if (!isValidEvmAddress(address)) return;
-    
+
     setIsLoadingEvmBalance(true);
     try {
-      const polkavmChain = POLKAVM_CHAINS[toNetworkId as keyof typeof POLKAVM_CHAINS];
+      const polkavmChain =
+        POLKAVM_CHAINS[toNetworkId as keyof typeof POLKAVM_CHAINS];
       if (!polkavmChain) return;
-      
+
       const provider = new ethers.JsonRpcProvider(polkavmChain.rpcUrl);
       const balance = await provider.getBalance(address);
       const formattedBalance = ethers.formatEther(balance);
-      
+
       setEvmBalance(formattedBalance);
     } catch (error) {
-      console.error('Failed to fetch EVM balance:', error);
+      console.error("Failed to fetch EVM balance:", error);
       setEvmBalance(null);
     } finally {
       setIsLoadingEvmBalance(false);
@@ -195,7 +223,12 @@ export function TokenBridge() {
   }, [recipientAddress, toNetwork.id]);
 
   const bridgeTokens = async () => {
-    if (!address || !recipientAddress || !amount || !isValidEvmAddress(recipientAddress)) {
+    if (
+      !address ||
+      !recipientAddress ||
+      !amount ||
+      !isValidEvmAddress(recipientAddress)
+    ) {
       setBridgeError("Please fill in all required fields with valid values");
       return;
     }
@@ -217,12 +250,12 @@ export function TokenBridge() {
       }));
 
       const mapResult = await mapAccount();
-      
+
       setTransactionSteps((prev) => ({
         ...prev,
-        mapAccount: { 
-          status: "completed", 
-          txHash: mapResult.transactionHash 
+        mapAccount: {
+          status: "completed",
+          txHash: mapResult.transactionHash,
         },
       }));
       setCurrentTxHash(mapResult.transactionHash);
@@ -234,12 +267,12 @@ export function TokenBridge() {
       }));
 
       const depositResult = await depositAccount(recipientAddress, amount);
-      
+
       setTransactionSteps((prev) => ({
         ...prev,
-        call: { 
-          status: "completed", 
-          txHash: depositResult.transactionHash 
+        call: {
+          status: "completed",
+          txHash: depositResult.transactionHash,
         },
       }));
       setCurrentTxHash(depositResult.transactionHash);
@@ -251,10 +284,11 @@ export function TokenBridge() {
         refreshBalance();
         setAmount("");
       }, 2000);
-
     } catch (error) {
-      console.error('Bridge transaction failed:', error);
-      setBridgeError(error instanceof Error ? error.message : 'Transaction failed');
+      console.error("Bridge transaction failed:", error);
+      setBridgeError(
+        error instanceof Error ? error.message : "Transaction failed"
+      );
       setIsBridging(false);
     }
   };
@@ -315,7 +349,7 @@ export function TokenBridge() {
               <label className="text-sm font-medium">From</label>
               <Badge variant="outline" className="text-xs">
                 <Clock className="w-3 h-3 mr-1" />
-                ~6s 
+                ~6s
               </Badge>
             </div>
 
@@ -325,7 +359,7 @@ export function TokenBridge() {
                   <DropdownMenuTrigger asChild>
                     <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                        <img 
+                        <img
                           src={fromNetwork.chainIconUrl}
                           alt={fromNetwork.name}
                           className="w-8 h-8 object-contain"
@@ -337,9 +371,9 @@ export function TokenBridge() {
                             if (nextElement) nextElement.style.display = "flex";
                           }}
                         />
-                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
+                        {/* <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
                           {fromNetwork.symbol[0]}
-                        </div>
+                        </div> */}
                       </div>
                       <div className="flex-1">
                         <div className="font-medium">{fromNetwork.name}</div>
@@ -358,7 +392,7 @@ export function TokenBridge() {
                           onClick={() => handleFromNetworkSelect(network)}
                           className="flex items-center gap-3 p-3 cursor-pointer">
                           <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                            <img 
+                            <img
                               src={network.chainIconUrl}
                               alt={network.name}
                               className="w-8 h-8 object-contain"
@@ -372,9 +406,9 @@ export function TokenBridge() {
                                   nextElement.style.display = "flex";
                               }}
                             />
-                            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
+                            {/* <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
                               {network.symbol[0]}
-                            </div>
+                            </div> */}
                           </div>
                           <div className="flex-1">
                             <div className="font-medium">{network.name}</div>
@@ -395,7 +429,7 @@ export function TokenBridge() {
               <Card className="p-4 bg-secondary/50 border-border/50">
                 <div className="flex items-center gap-3 cursor-pointer">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                    <img 
+                    <img
                       src={selectedToken.chainIconUrl}
                       alt={selectedToken.name}
                       className="w-8 h-8 object-contain"
@@ -407,9 +441,9 @@ export function TokenBridge() {
                         if (nextElement) nextElement.style.display = "flex";
                       }}
                     />
-                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold hidden">
+                    {/* <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold hidden">
                       {selectedToken.symbol[0]}
-                    </div>
+                    </div> */}
                   </div>
                   <div className="flex-1">
                     <div className="font-medium">{selectedToken.symbol}</div>
@@ -429,7 +463,10 @@ export function TokenBridge() {
                 value={amount}
                 onChange={(e) => {
                   const value = e.target.value;
-                  if (value === '' || (parseFloat(value) >= 0 && !isNaN(parseFloat(value)))) {
+                  if (
+                    value === "" ||
+                    (parseFloat(value) >= 0 && !isNaN(parseFloat(value)))
+                  ) {
                     setAmount(value);
                   }
                 }}
@@ -442,29 +479,33 @@ export function TokenBridge() {
                 size="sm"
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80"
                 onClick={() => setAmount(balance.formattedTotal)}
-                disabled={loadingBalance || !address || balance.formattedTotal === "0.0000"}>
+                disabled={
+                  loadingBalance ||
+                  !address ||
+                  balance.formattedTotal === "0.0000"
+                }>
                 MAX
               </Button>
             </div>
 
             <div className="flex justify-between text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
-              <span>
+                <span>
                   Balance:{" "}
                   {loadingBalance
                     ? "Loading..."
-                    : address 
-                      ? `${balance.formattedTotal} ${fromNetwork.symbol}`
-                      : "Connect wallet"}
-              </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={refreshBalance}
-                      disabled={loadingBalance || !address}
-                      className="h-6 px-2 text-xs">
-                      🔄
-                    </Button>
+                    : address
+                    ? `${balance.formattedTotal} ${fromNetwork.symbol}`
+                    : "Connect wallet"}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={refreshBalance}
+                  disabled={loadingBalance || !address}
+                  className="h-6 px-2 text-xs">
+                  🔄
+                </Button>
               </div>
               <span>{selectedToken.price}</span>
             </div>
@@ -496,7 +537,7 @@ export function TokenBridge() {
                   <DropdownMenuTrigger asChild>
                     <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                        <img 
+                        <img
                           src={toNetwork.chainIconUrl}
                           alt={toNetwork.name}
                           className="w-8 h-8 object-contain"
@@ -508,9 +549,9 @@ export function TokenBridge() {
                             if (nextElement) nextElement.style.display = "flex";
                           }}
                         />
-                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
+                        {/* <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
                           {toNetwork.symbol[0]}
-                        </div>
+                        </div> */}
                       </div>
                       <div className="flex-1">
                         <div className="font-medium">{toNetwork.name}</div>
@@ -529,7 +570,7 @@ export function TokenBridge() {
                           onClick={() => handleToNetworkSelect(network)}
                           className="flex items-center gap-3 p-3 cursor-pointer">
                           <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                            <img 
+                            <img
                               src={network.chainIconUrl}
                               alt={network.name}
                               className="w-8 h-8 object-contain"
@@ -543,9 +584,9 @@ export function TokenBridge() {
                                   nextElement.style.display = "flex";
                               }}
                             />
-                            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
+                            {/* <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
                               {network.symbol[0]}
-                            </div>
+                            </div> */}
                           </div>
                           <div className="flex-1">
                             <div className="font-medium">{network.name}</div>
@@ -566,7 +607,7 @@ export function TokenBridge() {
               <Card className="p-4 bg-secondary/50 border-border/50">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                    <img 
+                    <img
                       src={selectedToken.chainIconUrl}
                       alt={selectedToken.name}
                       className="w-8 h-8 object-contain"
@@ -578,9 +619,9 @@ export function TokenBridge() {
                         if (nextElement) nextElement.style.display = "flex";
                       }}
                     />
-                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold hidden">
+                    {/* <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold hidden">
                       {selectedToken.symbol[0]}
-                    </div>
+                    </div> */}
                   </div>
                   <div className="flex-1">
                     <div className="font-medium">{selectedToken.symbol}</div>
@@ -622,8 +663,8 @@ export function TokenBridge() {
                   recipientAddress && !isValidEvmAddress(recipientAddress)
                     ? "border-red-500 focus:border-red-500"
                     : recipientAddress && isValidEvmAddress(recipientAddress)
-                      ? "border-green-500 focus:border-green-500"
-                      : ""
+                    ? "border-green-500 focus:border-green-500"
+                    : ""
                 }`}
               />
               {recipientAddress && (
@@ -682,12 +723,12 @@ export function TokenBridge() {
             {isBridging
               ? "🔄 Bridging..."
               : !recipientAddress
-                ? "Enter Recipient Address"
-                : !isValidEvmAddress(recipientAddress)
-                  ? "Invalid EVM Address"
-                    : !amount
-                      ? "Enter Amount"
-                      : `Bridge ${amount} ${selectedToken.symbol}`}
+              ? "Enter Recipient Address"
+              : !isValidEvmAddress(recipientAddress)
+              ? "Invalid EVM Address"
+              : !amount
+              ? "Enter Amount"
+              : `Bridge ${amount} ${selectedToken.symbol}`}
           </Button>
         </Card>
       </div>
@@ -705,7 +746,7 @@ export function TokenBridge() {
               Bridging tokens to PolkaVM...
             </p>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             {/* Current Transaction Hash */}
             {currentTxHash && (
@@ -797,7 +838,7 @@ export function TokenBridge() {
             )}
 
             {/* Processing Button */}
-            <Button 
+            <Button
               className="w-full bg-pink-500 hover:bg-pink-600 text-white"
               disabled>
               Processing...
