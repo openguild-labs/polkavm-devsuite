@@ -3,6 +3,7 @@ import { Binary, createClient } from 'polkadot-api';
 import { getWsProvider } from 'polkadot-api/ws-provider/web';
 import { useEffect, useState } from 'react';
 import { CHAINS, type Chain } from '../constants/index';
+import { convertPublicKeyToSs58, ss58ToH160 } from '@/lib/utils';
 
 export interface PapiClientState {
   client: any;
@@ -132,6 +133,26 @@ export function usePapiClient() {
       });
     });
   };
+
+
+  const isMappedAccount = async (): Promise<boolean> => {
+    const { currentChain, client, isReady } = state;
+
+    if (!isReady || !currentChain) {
+      throw new Error('Client not ready');
+    }
+
+    if (!address) {
+      throw new Error('Address not found');
+    }
+
+    const value = client.getTypedApi(currentChain.descriptors).api.query.Revive.OriginalAccount.getValue(
+      ss58ToH160(address),
+    );
+
+    return value ? true : false;
+  };
+
 
 
   const depositAccount = async (to: string, value: string, ): Promise<{ transactionHash: string; status: string; errorMessage: string | null }> => {
