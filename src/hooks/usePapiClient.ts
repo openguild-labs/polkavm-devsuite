@@ -1,5 +1,4 @@
 import { useAccount, usePapiSigner } from '@luno-kit/react';
-import { MultiAddress } from '@polkadot-api/descriptors';
 import { Binary, createClient } from 'polkadot-api';
 import { getWsProvider } from 'polkadot-api/ws-provider/web';
 import { useEffect, useState } from 'react';
