@@ -52,6 +52,7 @@ export function TokenBridge() {
     isReady,
     mapAccount,
     depositAccount,
+    isMappedAccount,
   } = usePapiClient();
 
   const [fromNetwork, setFromNetwork] = useState(FROM_NETWORKS[0]);
@@ -236,46 +237,76 @@ export function TokenBridge() {
     setIsBridging(true);
     setBridgeError(null);
     setShowTransactionDialog(true);
-    setTransactionSteps({
-      mapAccount: { status: "pending", txHash: null },
-      call: { status: "pending", txHash: null },
-    });
     setCurrentTxHash(null);
 
     try {
-      // Step 1: Map Account
-      setTransactionSteps((prev) => ({
-        ...prev,
-        mapAccount: { status: "active", txHash: null },
-      }));
+      // Check if account is already mapped
+      const isAlreadyMapped = await isMappedAccount();
+      
+      if (isAlreadyMapped) {
+        // Account is already mapped, skip map step and go directly to deposit
+        setTransactionSteps({
+          mapAccount: { status: "completed", txHash: null },
+          call: { status: "pending", txHash: null },
+        });
 
-      const mapResult = await mapAccount();
+        // Step: Deposit Account (skip mapping)
+        setTransactionSteps((prev) => ({
+          ...prev,
+          call: { status: "active", txHash: null },
+        }));
 
-      setTransactionSteps((prev) => ({
-        ...prev,
-        mapAccount: {
-          status: "completed",
-          txHash: mapResult.transactionHash,
-        },
-      }));
-      setCurrentTxHash(mapResult.transactionHash);
+        const depositResult = await depositAccount(recipientAddress, amount);
 
-      // Step 2: Deposit Account
-      setTransactionSteps((prev) => ({
-        ...prev,
-        call: { status: "active", txHash: null },
-      }));
+        setTransactionSteps((prev) => ({
+          ...prev,
+          call: {
+            status: "completed",
+            txHash: depositResult.transactionHash,
+          },
+        }));
+        setCurrentTxHash(depositResult.transactionHash);
+      } else {
+        // Account is not mapped, need to map first then deposit
+        setTransactionSteps({
+          mapAccount: { status: "pending", txHash: null },
+          call: { status: "pending", txHash: null },
+        });
 
-      const depositResult = await depositAccount(recipientAddress, amount);
+        // Step 1: Map Account
+        setTransactionSteps((prev) => ({
+          ...prev,
+          mapAccount: { status: "active", txHash: null },
+        }));
 
-      setTransactionSteps((prev) => ({
-        ...prev,
-        call: {
-          status: "completed",
-          txHash: depositResult.transactionHash,
-        },
-      }));
-      setCurrentTxHash(depositResult.transactionHash);
+        const mapResult = await mapAccount();
+
+        setTransactionSteps((prev) => ({
+          ...prev,
+          mapAccount: {
+            status: "completed",
+            txHash: mapResult.transactionHash,
+          },
+        }));
+        setCurrentTxHash(mapResult.transactionHash);
+
+        // Step 2: Deposit Account
+        setTransactionSteps((prev) => ({
+          ...prev,
+          call: { status: "active", txHash: null },
+        }));
+
+        const depositResult = await depositAccount(recipientAddress, amount);
+
+        setTransactionSteps((prev) => ({
+          ...prev,
+          call: {
+            status: "completed",
+            txHash: depositResult.transactionHash,
+          },
+        }));
+        setCurrentTxHash(depositResult.transactionHash);
+      }
 
       // Success - close dialog and refresh balance
       setTimeout(() => {

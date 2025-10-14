@@ -146,7 +146,7 @@ export function usePapiClient() {
       throw new Error('Address not found');
     }
 
-    const value = client.getTypedApi(currentChain.descriptors).api.query.Revive.OriginalAccount.getValue(
+    const value = client.getTypedApi(currentChain.descriptors).query.Revive.OriginalAccount.getValue(
       ss58ToH160(address),
     );
 
@@ -223,6 +223,7 @@ export function usePapiClient() {
       }
     },
     mapAccount,
-    depositAccount
+    depositAccount,
+    isMappedAccount
   };
 }
