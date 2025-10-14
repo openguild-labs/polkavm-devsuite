@@ -32,10 +32,12 @@ import { WalletConnect } from "./WalletConnect";
 import { FROM_NETWORKS, TO_NETWORKS, CHAINS, POLKAVM_CHAINS, type SupportedChain, type SupportedPolkaVMChain } from "@/constants";
 import { usePapiClient } from "@/hooks/usePapiClient";
 import { useAccount } from "@luno-kit/react";
+import { ethers } from "ethers";
+import { useEffect } from "react";
 
 export function TokenBridge() {
   const { address } = useAccount();
-  const { balance, loadingBalance, refreshBalance, switchChain, isReady } = usePapiClient();
+  const { balance, loadingBalance, refreshBalance, switchChain, isReady, mapAccount, depositAccount } = usePapiClient();
   
   const [fromNetwork, setFromNetwork] = useState(FROM_NETWORKS[0]);
   const [toNetwork, setToNetwork] = useState(() => {
@@ -163,7 +165,41 @@ export function TokenBridge() {
     return /^0x[a-fA-F0-9]{40}$/.test(address);
   };
 
+  const fetchEvmBalance = async (address: string, toNetworkId: string) => {
+    if (!isValidEvmAddress(address)) return;
+    
+    setIsLoadingEvmBalance(true);
+    try {
+      const polkavmChain = POLKAVM_CHAINS[toNetworkId as keyof typeof POLKAVM_CHAINS];
+      if (!polkavmChain) return;
+      
+      const provider = new ethers.JsonRpcProvider(polkavmChain.rpcUrl);
+      const balance = await provider.getBalance(address);
+      const formattedBalance = ethers.formatEther(balance);
+      
+      setEvmBalance(formattedBalance);
+    } catch (error) {
+      console.error('Failed to fetch EVM balance:', error);
+      setEvmBalance(null);
+    } finally {
+      setIsLoadingEvmBalance(false);
+    }
+  };
+
+  useEffect(() => {
+    if (recipientAddress && isValidEvmAddress(recipientAddress)) {
+      fetchEvmBalance(recipientAddress, toNetwork.id);
+    } else {
+      setEvmBalance(null);
+    }
+  }, [recipientAddress, toNetwork.id]);
+
   const bridgeTokens = async () => {
+    if (!address || !recipientAddress || !amount || !isValidEvmAddress(recipientAddress)) {
+      setBridgeError("Please fill in all required fields with valid values");
+      return;
+    }
+
     setIsBridging(true);
     setBridgeError(null);
     setShowTransactionDialog(true);
@@ -173,38 +209,54 @@ export function TokenBridge() {
     });
     setCurrentTxHash(null);
 
-    // Simulate transaction steps
-    setTimeout(() => {
+    try {
+      // Step 1: Map Account
       setTransactionSteps((prev) => ({
         ...prev,
         mapAccount: { status: "active", txHash: null },
       }));
-    }, 1000);
 
-    setTimeout(() => {
+      const mapResult = await mapAccount();
+      
       setTransactionSteps((prev) => ({
         ...prev,
-        mapAccount: { status: "completed", txHash: "0x1234..." },
+        mapAccount: { 
+          status: "completed", 
+          txHash: mapResult.transactionHash 
+        },
       }));
-      setCurrentTxHash("0x1234...");
-    }, 3000);
+      setCurrentTxHash(mapResult.transactionHash);
 
-    setTimeout(() => {
+      // Step 2: Deposit Account
       setTransactionSteps((prev) => ({
-          ...prev,
+        ...prev,
         call: { status: "active", txHash: null },
       }));
-    }, 4000);
 
-      setTimeout(() => {
+      const depositResult = await depositAccount(recipientAddress, amount);
+      
       setTransactionSteps((prev) => ({
         ...prev,
-        call: { status: "completed", txHash: "0x5678..." },
+        call: { 
+          status: "completed", 
+          txHash: depositResult.transactionHash 
+        },
       }));
-      setCurrentTxHash("0x5678...");
-      setShowTransactionDialog(false);
+      setCurrentTxHash(depositResult.transactionHash);
+
+      // Success - close dialog and refresh balance
+      setTimeout(() => {
+        setShowTransactionDialog(false);
+        setIsBridging(false);
+        refreshBalance();
+        setAmount("");
+      }, 2000);
+
+    } catch (error) {
+      console.error('Bridge transaction failed:', error);
+      setBridgeError(error instanceof Error ? error.message : 'Transaction failed');
       setIsBridging(false);
-    }, 6000);
+    }
   };
 
   return (
@@ -596,15 +648,17 @@ export function TokenBridge() {
             )}
 
             {/* EVM Balance Display */}
-            {(isLoadingEvmBalance || evmBalance !== null) && (
+            {recipientAddress && isValidEvmAddress(recipientAddress) && (
               <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <span>Balance on {toNetwork.name}:</span>
                 {isLoadingEvmBalance ? (
                   <span>Loading...</span>
-                ) : (
+                ) : evmBalance !== null ? (
                   <span className="font-medium text-primary">
-                    {evmBalance} {toNetwork.symbol}
+                    {parseFloat(evmBalance).toFixed(4)} {toNetwork.symbol}
                   </span>
+                ) : (
+                  <span>0.0000 {toNetwork.symbol}</span>
                 )}
               </div>
             )}
