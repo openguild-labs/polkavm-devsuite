@@ -33,7 +33,15 @@ import { FROM_NETWORKS, TO_NETWORKS, CHAINS, POLKAVM_CHAINS, type SupportedChain
 
 export function TokenBridge() {
   const [fromNetwork, setFromNetwork] = useState(FROM_NETWORKS[0]);
-  const [toNetwork, setToNetwork] = useState(TO_NETWORKS[0]);
+  const [toNetwork, setToNetwork] = useState(() => {
+    const correspondingToNetwork = TO_NETWORKS.find(toNetwork => {
+      if (FROM_NETWORKS[0].id === 'paseoPassetHub') return toNetwork.id === 'passet';
+      if (FROM_NETWORKS[0].id === 'westendAssetHub') return toNetwork.id === 'wah';
+      if (FROM_NETWORKS[0].id === 'kusamaAssetHub') return toNetwork.id === 'kah';
+      return false;
+    });
+    return correspondingToNetwork || TO_NETWORKS[0];
+  });
   const [selectedToken, setSelectedToken] = useState({
     symbol: FROM_NETWORKS[0].symbol,
     name: `${FROM_NETWORKS[0].name} Token`,
@@ -63,21 +71,41 @@ export function TokenBridge() {
   const [currentTxHash, setCurrentTxHash] = useState<string | null>(null);
 
   const swapNetworks = () => {
-    const currentFromIndex = fromNetworks.findIndex(
+    const currentFromIndex = FROM_NETWORKS.findIndex(
       (n) => n.id === fromNetwork.id
     );
-    const currentToIndex = toNetworks.findIndex((n) => n.id === toNetwork.id);
-    const nextFromIndex = (currentFromIndex + 1) % fromNetworks.length;
-    const nextToIndex = (currentToIndex + 1) % toNetworks.length;
-    setFromNetwork(fromNetworks[nextFromIndex]);
-    setToNetwork(toNetworks[nextToIndex]);
+    const nextFromIndex = (currentFromIndex + 1) % FROM_NETWORKS.length;
+    const nextFromNetwork = FROM_NETWORKS[nextFromIndex];
+    
+    const correspondingToNetwork = TO_NETWORKS.find(toNetwork => {
+      if (nextFromNetwork.id === 'paseoPassetHub') return toNetwork.id === 'passet';
+      if (nextFromNetwork.id === 'westendAssetHub') return toNetwork.id === 'wah';
+      if (nextFromNetwork.id === 'kusamaAssetHub') return toNetwork.id === 'kah';
+      return false;
+    });
+    
+    setFromNetwork(nextFromNetwork);
+    if (correspondingToNetwork) {
+      setToNetwork(correspondingToNetwork);
+    }
   };
 
-  const handleFromNetworkSelect = (network: (typeof fromNetworks)[0]) => {
+  const handleFromNetworkSelect = (network: typeof FROM_NETWORKS[0]) => {
     setFromNetwork(network);
+    
+    const correspondingToNetwork = TO_NETWORKS.find(toNetwork => {
+      if (network.id === 'paseoPassetHub') return toNetwork.id === 'passet';
+      if (network.id === 'westendAssetHub') return toNetwork.id === 'wah';
+      if (network.id === 'kusamaAssetHub') return toNetwork.id === 'kah';
+      return false;
+    });
+    
+    if (correspondingToNetwork) {
+      setToNetwork(correspondingToNetwork);
+    }
   };
 
-  const handleToNetworkSelect = (network: (typeof toNetworks)[0]) => {
+  const handleToNetworkSelect = (network: typeof TO_NETWORKS[0]) => {
     setToNetwork(network);
   };
 
@@ -121,12 +149,12 @@ export function TokenBridge() {
 
     setTimeout(() => {
       setTransactionSteps((prev) => ({
-        ...prev,
+          ...prev,
         call: { status: "active", txHash: null },
       }));
     }, 4000);
 
-    setTimeout(() => {
+      setTimeout(() => {
       setTransactionSteps((prev) => ({
         ...prev,
         call: { status: "completed", txHash: "0x5678..." },
@@ -193,7 +221,7 @@ export function TokenBridge() {
               <label className="text-sm font-medium">From</label>
               <Badge variant="outline" className="text-xs">
                 <Clock className="w-3 h-3 mr-1" />
-                ~6s
+                ~6s 
               </Badge>
             </div>
 
@@ -203,7 +231,7 @@ export function TokenBridge() {
                   <DropdownMenuTrigger asChild>
                     <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                        <img
+                        <img 
                           src={fromNetwork.chainIconUrl}
                           alt={fromNetwork.name}
                           className="w-8 h-8 object-contain"
@@ -230,13 +258,13 @@ export function TokenBridge() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-80">
                     <ScrollArea className="h-64">
-                      {fromNetworks.map((network) => (
+                      {FROM_NETWORKS.map((network) => (
                         <DropdownMenuItem
                           key={network.id}
                           onClick={() => handleFromNetworkSelect(network)}
                           className="flex items-center gap-3 p-3 cursor-pointer">
                           <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                            <img
+                            <img 
                               src={network.chainIconUrl}
                               alt={network.name}
                               className="w-8 h-8 object-contain"
@@ -273,7 +301,7 @@ export function TokenBridge() {
               <Card className="p-4 bg-secondary/50 border-border/50">
                 <div className="flex items-center gap-3 cursor-pointer">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                    <img
+                    <img 
                       src={selectedToken.chainIconUrl}
                       alt={selectedToken.name}
                       className="w-8 h-8 object-contain"
@@ -322,20 +350,20 @@ export function TokenBridge() {
 
             <div className="flex justify-between text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
-                <span>
+              <span>
                   Balance:{" "}
                   {isLoadingBalance
                     ? "Loading..."
                     : `${accountBalance} ${fromNetwork.symbol}`}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
+              </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                   onClick={() => {}}
-                  disabled={isLoadingBalance}
+                      disabled={isLoadingBalance}
                   className="h-6 px-2 text-xs">
-                  🔄
-                </Button>
+                      🔄
+                    </Button>
               </div>
               <span>{selectedToken.price}</span>
             </div>
@@ -367,7 +395,7 @@ export function TokenBridge() {
                   <DropdownMenuTrigger asChild>
                     <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                        <img
+                        <img 
                           src={toNetwork.chainIconUrl}
                           alt={toNetwork.name}
                           className="w-8 h-8 object-contain"
@@ -394,13 +422,13 @@ export function TokenBridge() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-80">
                     <ScrollArea className="h-64">
-                      {toNetworks.map((network) => (
+                      {TO_NETWORKS.map((network) => (
                         <DropdownMenuItem
                           key={network.id}
                           onClick={() => handleToNetworkSelect(network)}
                           className="flex items-center gap-3 p-3 cursor-pointer">
                           <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                            <img
+                            <img 
                               src={network.chainIconUrl}
                               alt={network.name}
                               className="w-8 h-8 object-contain"
@@ -437,7 +465,7 @@ export function TokenBridge() {
               <Card className="p-4 bg-secondary/50 border-border/50">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                    <img
+                    <img 
                       src={selectedToken.chainIconUrl}
                       alt={selectedToken.name}
                       className="w-8 h-8 object-contain"
@@ -493,8 +521,8 @@ export function TokenBridge() {
                   recipientAddress && !isValidEvmAddress(recipientAddress)
                     ? "border-red-500 focus:border-red-500"
                     : recipientAddress && isValidEvmAddress(recipientAddress)
-                    ? "border-green-500 focus:border-green-500"
-                    : ""
+                      ? "border-green-500 focus:border-green-500"
+                      : ""
                 }`}
               />
               {recipientAddress && (
@@ -551,12 +579,12 @@ export function TokenBridge() {
             {isBridging
               ? "🔄 Bridging..."
               : !recipientAddress
-              ? "Enter Recipient Address"
-              : !isValidEvmAddress(recipientAddress)
-              ? "Invalid EVM Address"
-              : !amount
-              ? "Enter Amount"
-              : `Bridge ${amount} ${selectedToken.symbol}`}
+                ? "Enter Recipient Address"
+                : !isValidEvmAddress(recipientAddress)
+                  ? "Invalid EVM Address"
+                    : !amount
+                      ? "Enter Amount"
+                      : `Bridge ${amount} ${selectedToken.symbol}`}
           </Button>
         </Card>
       </div>
@@ -574,7 +602,7 @@ export function TokenBridge() {
               Bridging tokens to PolkaVM...
             </p>
           </DialogHeader>
-
+          
           <div className="space-y-4">
             {/* Current Transaction Hash */}
             {currentTxHash && (
@@ -666,7 +694,7 @@ export function TokenBridge() {
             )}
 
             {/* Processing Button */}
-            <Button
+            <Button 
               className="w-full bg-pink-500 hover:bg-pink-600 text-white"
               disabled>
               Processing...
