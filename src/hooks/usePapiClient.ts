@@ -144,7 +144,7 @@ export function usePapiClient() {
   };
 
   useEffect(() => {
-    initializeClient(CHAINS.polkadot);
+    initializeClient(CHAINS.paseoPassetHub);
   }, []);
 
   useEffect(() => {

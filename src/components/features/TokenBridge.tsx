@@ -30,8 +30,13 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { WalletConnect } from "./WalletConnect";
 import { FROM_NETWORKS, TO_NETWORKS, CHAINS, POLKAVM_CHAINS, type SupportedChain, type SupportedPolkaVMChain } from "@/constants";
+import { usePapiClient } from "@/hooks/usePapiClient";
+import { useAccount } from "@luno-kit/react";
 
 export function TokenBridge() {
+  const { address } = useAccount();
+  const { balance, loadingBalance, refreshBalance, switchChain, isReady } = usePapiClient();
+  
   const [fromNetwork, setFromNetwork] = useState(FROM_NETWORKS[0]);
   const [toNetwork, setToNetwork] = useState(() => {
     const correspondingToNetwork = TO_NETWORKS.find(toNetwork => {
@@ -51,8 +56,6 @@ export function TokenBridge() {
   const [amount, setAmount] = useState("");
   const [recipientAddress, setRecipientAddress] = useState("");
   const [addressCopied, setAddressCopied] = useState(false);
-  const [accountBalance, setAccountBalance] = useState("0.0000");
-  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [isBridging, setIsBridging] = useState(false);
   const [bridgeError, setBridgeError] = useState<string | null>(null);
   const [evmBalance, setEvmBalance] = useState<string | null>(null);
@@ -95,6 +98,10 @@ export function TokenBridge() {
       price: "$",
       chainIconUrl: CHAINS[nextFromNetwork.id as keyof typeof CHAINS]?.nativeCurrency.tokenUrl || nextFromNetwork.chainIconUrl,
     });
+    
+    if (address) {
+      switchChain(nextFromNetwork.id);
+    }
   };
 
   const handleFromNetworkSelect = (network: typeof FROM_NETWORKS[0]) => {
@@ -117,6 +124,10 @@ export function TokenBridge() {
       price: "$",
       chainIconUrl: CHAINS[network.id as keyof typeof CHAINS]?.nativeCurrency.tokenUrl || network.chainIconUrl,
     });
+    
+    if (address) {
+      switchChain(network.id);
+    }
   };
 
   const handleToNetworkSelect = (network: typeof TO_NETWORKS[0]) => {
@@ -373,8 +384,8 @@ export function TokenBridge() {
                 variant="ghost"
                 size="sm"
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80"
-                onClick={() => setAmount(accountBalance)}
-                disabled={isLoadingBalance || accountBalance === "0.0000"}>
+                onClick={() => setAmount(balance.formattedTotal)}
+                disabled={loadingBalance || !address || balance.formattedTotal === "0.0000"}>
                 MAX
               </Button>
             </div>
@@ -383,16 +394,18 @@ export function TokenBridge() {
               <div className="flex items-center gap-2">
               <span>
                   Balance:{" "}
-                  {isLoadingBalance
+                  {loadingBalance
                     ? "Loading..."
-                    : `${accountBalance} ${fromNetwork.symbol}`}
+                    : address 
+                      ? `${balance.formattedTotal} ${fromNetwork.symbol}`
+                      : "Connect wallet"}
               </span>
                     <Button
                       variant="ghost"
                       size="sm"
-                  onClick={() => {}}
-                      disabled={isLoadingBalance}
-                  className="h-6 px-2 text-xs">
+                      onClick={refreshBalance}
+                      disabled={loadingBalance || !address}
+                      className="h-6 px-2 text-xs">
                       🔄
                     </Button>
               </div>
