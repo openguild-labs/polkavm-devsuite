@@ -1,6 +1,6 @@
 import { useAccount, usePapiSigner } from '@luno-kit/react';
 import { MultiAddress } from '@polkadot-api/descriptors';
-import { createClient } from 'polkadot-api';
+import { Binary, createClient } from 'polkadot-api';
 import { getWsProvider } from 'polkadot-api/ws-provider/web';
 import { useEffect, useState } from 'react';
 import { CHAINS, type Chain } from '../constants/index';
@@ -104,23 +104,14 @@ export function usePapiClient() {
     }
   };
 
-  const sendTransaction = async (
-    to: string,
-    amount: string
-  ): Promise<{ transactionHash: string; status: string; errorMessage: string | null }> => {
+  const mapAccount = async (): Promise<{ transactionHash: string; status: string; errorMessage: string | null }> => {
     const { currentChain, client, isReady } = state;
 
     if (!isReady || !currentChain) {
       throw new Error('Client not ready');
     }
 
-    const decimals = currentChain.nativeCurrency.decimals;
-    const amountInPlanck = BigInt(parseFloat(amount) * 10 ** decimals);
-
-    const tx = client.getTypedApi(currentChain.descriptors).tx.Balances.transfer_keep_alive({
-      dest: MultiAddress.Id(to),
-      value: amountInPlanck,
-    });
+    const tx = client.getTypedApi(currentChain.descriptors).tx.Revive.map_account();
 
     return new Promise((resolve, reject) => {
       const subscription = tx.signSubmitAndWatch(papiSigner).subscribe({
@@ -143,6 +134,53 @@ export function usePapiClient() {
     });
   };
 
+
+  const depositAccount = async (to: string, value: string, ): Promise<{ transactionHash: string; status: string; errorMessage: string | null }> => {
+    const { currentChain, client, isReady } = state;
+
+    if (!isReady || !currentChain) {
+      throw new Error('Client not ready');
+    }
+
+    const decimals = currentChain.nativeCurrency.decimals;
+    const amountInPlanck = BigInt(parseFloat(value) * 10 ** decimals);
+
+    const tx = client.getTypedApi(currentChain.descriptors).tx.Revive.call({
+        dest: Binary.fromHex(to), // EVM address
+        value: amountInPlanck, // Amount in native chain units (planck) - already bigint
+        gas_limit: {
+          // computation cost
+          ref_time: BigInt(1e12),
+          // storage cost  
+          proof_size: BigInt(1e6), 
+        },
+        storage_deposit_limit: BigInt(1000000000000000), // Storage deposit limit
+        data: Binary.fromHex("0x")// Empty data
+      })
+
+    return new Promise((resolve, reject) => {
+      const subscription = tx.signSubmitAndWatch(papiSigner).subscribe({
+        next: (event: any) => {
+          console.log('Tx event: ', event.type);
+          if (event.type === 'txBestBlocksState') {
+            subscription.unsubscribe();
+            resolve({
+              status: 'success',
+              transactionHash: event.txHash,
+              errorMessage: null,
+            });
+          }
+        },
+        error: (error: any) => {
+          subscription.unsubscribe();
+          reject(error);
+        },
+      });
+    });
+  };
+
+
+
   useEffect(() => {
     initializeClient(CHAINS.paseoPassetHub);
   }, []);
@@ -164,6 +202,7 @@ export function usePapiClient() {
         fetchBalance(address, state.client, state.currentChain);
       }
     },
-    sendTransaction,
+    mapAccount,
+    depositAccount
   };
 }

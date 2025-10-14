@@ -375,7 +375,12 @@ export function TokenBridge() {
                 type="number"
                 placeholder="0.0"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '' || (parseFloat(value) >= 0 && !isNaN(parseFloat(value)))) {
+                    setAmount(value);
+                  }
+                }}
                 min="0"
                 step="0.0001"
                 className="text-2xl h-16 bg-secondary/30 border-border/50 pr-20"
