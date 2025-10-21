@@ -39,7 +39,7 @@ import {
 } from "@/constants";
 import { usePapiClient } from "@/hooks/usePapiClient";
 import { useAccount } from "@luno-kit/react";
-import { ethers } from "ethers";
+import { createPublicClient, http, formatEther } from 'viem';
 import { useEffect } from "react";
 
 export function TokenBridge() {
@@ -202,9 +202,11 @@ export function TokenBridge() {
         POLKAVM_CHAINS[toNetworkId as keyof typeof POLKAVM_CHAINS];
       if (!polkavmChain) return;
 
-      const provider = new ethers.JsonRpcProvider(polkavmChain.rpcUrl);
-      const balance = await provider.getBalance(address);
-      const formattedBalance = ethers.formatEther(balance);
+      const client = createPublicClient({
+        transport: http(polkavmChain.rpcUrl),
+      });
+      const balance = await client.getBalance({ address: address as `0x${string}` });
+      const formattedBalance = formatEther(balance);
 
       setEvmBalance(formattedBalance);
     } catch (error) {
