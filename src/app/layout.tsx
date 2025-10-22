@@ -2,8 +2,10 @@ import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Toaster } from '@/components/ui/sonner'
-import Providers from './Providers'
+import SubstrateKitProviders from '@/app/SubstrateProvider'
+import { WagmiProvider } from '@/app/WagmiProvider'
 import '@luno-kit/ui/styles.css';
+import '@rainbow-me/rainbowkit/styles.css';
 
 import './globals.css'
 
@@ -21,10 +23,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <Providers>
-          {children}
-          <Toaster />
-        </Providers>
+        <SubstrateKitProviders>
+          <WagmiProvider>
+            {children}
+            <Toaster />
+          </WagmiProvider>
+        </SubstrateKitProviders>
       </body>
     </html>
   )

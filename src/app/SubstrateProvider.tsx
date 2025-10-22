@@ -24,6 +24,6 @@ const lunoConfig = createConfig({
   autoConnect: true,
 });
 
-export default function Providers({ children }: { children: React.ReactNode }) {
+export default function SubstrateKitProviders({ children }: { children: React.ReactNode }) {
   return <LunoKitProvider config={lunoConfig}>{children}</LunoKitProvider>;
 }
