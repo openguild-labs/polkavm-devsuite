@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { WalletConnect } from "./WalletConnect";
+import { EvmWalletConnect } from "./EvmWalletConnect";
 import {
   FROM_NETWORKS,
   TO_NETWORKS,
@@ -38,8 +39,9 @@ import {
   type SupportedPolkaVMChain,
 } from "@/constants";
 import { usePapiClient } from "@/hooks/usePapiClient";
-import { useAccount } from "@luno-kit/react";
+import { useAccount, useDisconnect } from "@luno-kit/react";
 import { createPublicClient, http, formatEther } from 'viem';
+import { useDisconnect as useEvmDisconnect } from 'wagmi';
 import { useEffect } from "react";
 
 export function TokenBridge() {
@@ -54,6 +56,8 @@ export function TokenBridge() {
     depositAccount,
     isMappedAccount,
   } = usePapiClient();
+  const { disconnect: disconnectEvm } = useEvmDisconnect();
+  const { disconnect: disconnectSubstrate } = useDisconnect();
 
   const [fromNetwork, setFromNetwork] = useState(FROM_NETWORKS[0]);
   const [toNetwork, setToNetwork] = useState(() => {
@@ -105,6 +109,19 @@ export function TokenBridge() {
   };
 
   const swapNetworks = () => {
+    // Determine if we're switching FROM substrate TO polkavm or vice versa
+    const isFromSubstrate = FROM_NETWORKS.some(n => n.id === fromNetwork.id);
+    const isToPolkaVM = TO_NETWORKS.some(n => n.id === toNetwork.id);
+    
+    // Disconnect appropriate wallet
+    if (isFromSubstrate && isToPolkaVM) {
+      // Switching from Substrate to PolkaVM, disconnect Substrate wallet
+      disconnectSubstrate();
+    } else if (!isFromSubstrate && !isToPolkaVM) {
+      // Switching from PolkaVM to Substrate, disconnect EVM wallet
+      disconnectEvm();
+    }
+    
     setIsReversed(!isReversed);
     
     const tempFrom = fromNetwork;
@@ -351,7 +368,11 @@ export function TokenBridge() {
           </div>
 
           <div className="flex items-center gap-4">
-            <WalletConnect />
+            {TO_NETWORKS.some(network => network.id === fromNetwork.id) ? (
+              <EvmWalletConnect />
+            ) : (
+              <WalletConnect />
+            )}
           </div>
         </div>
       </header>
@@ -668,8 +689,11 @@ export function TokenBridge() {
                 {amount || "0.0"}
               </div>
               <div className="text-sm text-muted-foreground mt-1">
-                You will receive ≈ {amount || "0.0"} PolkaVM{" "}
-                {selectedToken.symbol}
+                {TO_NETWORKS.some(network => network.id === toNetwork.id) ? (
+                  <>You will receive ≈ {amount || "0.0"} PolkaVM {selectedToken.symbol}</>
+                ) : (
+                  <>You will receive ≈ {amount || "0.0"} {selectedToken.symbol}</>
+                )}
               </div>
             </Card>
           </div>
