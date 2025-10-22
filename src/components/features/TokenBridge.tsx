@@ -93,50 +93,46 @@ export function TokenBridge() {
     },
   });
   const [currentTxHash, setCurrentTxHash] = useState<string | null>(null);
+  const [isReversed, setIsReversed] = useState(false);
 
-  const swapNetworks = () => {
-    const currentFromIndex = FROM_NETWORKS.findIndex(
-      (n) => n.id === fromNetwork.id
-    );
-    const nextFromIndex = (currentFromIndex + 1) % FROM_NETWORKS.length;
-    const nextFromNetwork = FROM_NETWORKS[nextFromIndex];
-
-    const correspondingToNetwork = TO_NETWORKS.find((toNetwork) => {
-      if (nextFromNetwork.id === "paseoPassetHub")
-        return toNetwork.id === "passet";
-      if (nextFromNetwork.id === "westendAssetHub")
-        return toNetwork.id === "wah";
-      if (nextFromNetwork.id === "kusamaAssetHub")
-        return toNetwork.id === "kah";
-      return false;
-    });
-
-    setFromNetwork(nextFromNetwork);
-    if (correspondingToNetwork) {
-      setToNetwork(correspondingToNetwork);
-    }
-
-    setSelectedToken({
-      symbol: nextFromNetwork.symbol,
-      name: `${nextFromNetwork.name} Token`,
-      price: "$",
-      chainIconUrl:
-        CHAINS[nextFromNetwork.id as keyof typeof CHAINS]?.nativeCurrency
-          .tokenUrl || nextFromNetwork.chainIconUrl,
-    });
-
-    if (address) {
-      switchChain(nextFromNetwork.id);
+  const getTokenName = (network: any) => {
+    if (network.displayName) {
+      const baseName = network.displayName.replace(/PolkaVM\s+/i, '').replace(/\s+Asset Hub/i, '');
+      return `PolkaVM ${baseName} Token`;
+    } else {
+      return `${network.name} Token`;
     }
   };
 
-  const handleFromNetworkSelect = (network: (typeof FROM_NETWORKS)[0]) => {
+  const swapNetworks = () => {
+    setIsReversed(!isReversed);
+    
+    const tempFrom = fromNetwork;
+    setFromNetwork(toNetwork);
+    setToNetwork(tempFrom);
+    
+    setSelectedToken({
+      symbol: toNetwork.symbol,
+      name: getTokenName(toNetwork),
+      price: "$",
+      chainIconUrl: toNetwork.chainIconUrl,
+    });
+    
+    if (address) {
+      switchChain(toNetwork.id);
+    }
+  };
+
+  const handleFromNetworkSelect = (network: any) => {
     setFromNetwork(network);
 
-    const correspondingToNetwork = TO_NETWORKS.find((toNetwork) => {
-      if (network.id === "paseoPassetHub") return toNetwork.id === "passet";
-      if (network.id === "westendAssetHub") return toNetwork.id === "wah";
-      if (network.id === "kusamaAssetHub") return toNetwork.id === "kah";
+    const correspondingToNetwork = [...FROM_NETWORKS, ...TO_NETWORKS].find((otherNetwork) => {
+      if (network.id === "paseoPassetHub") return otherNetwork.id === "passet";
+      if (network.id === "westendAssetHub") return otherNetwork.id === "wah";
+      if (network.id === "kusamaAssetHub") return otherNetwork.id === "kah";
+      if (network.id === "passet") return otherNetwork.id === "paseoPassetHub";
+      if (network.id === "wah") return otherNetwork.id === "westendAssetHub";
+      if (network.id === "kah") return otherNetwork.id === "kusamaAssetHub";
       return false;
     });
 
@@ -146,7 +142,7 @@ export function TokenBridge() {
 
     setSelectedToken({
       symbol: network.symbol,
-      name: `${network.name} Token`,
+      name: getTokenName(network),
       price: "$",
       chainIconUrl:
         CHAINS[network.id as keyof typeof CHAINS]?.nativeCurrency.tokenUrl ||
@@ -158,13 +154,16 @@ export function TokenBridge() {
     }
   };
 
-  const handleToNetworkSelect = (network: (typeof TO_NETWORKS)[0]) => {
+  const handleToNetworkSelect = (network: any) => {
     setToNetwork(network);
 
-    const correspondingFromNetwork = FROM_NETWORKS.find((fromNetwork) => {
-      if (network.id === "passet") return fromNetwork.id === "paseoPassetHub";
-      if (network.id === "wah") return fromNetwork.id === "westendAssetHub";
-      if (network.id === "kah") return fromNetwork.id === "kusamaAssetHub";
+    const correspondingFromNetwork = [...FROM_NETWORKS, ...TO_NETWORKS].find((otherNetwork) => {
+      if (network.id === "paseoPassetHub") return otherNetwork.id === "passet";
+      if (network.id === "westendAssetHub") return otherNetwork.id === "wah";
+      if (network.id === "kusamaAssetHub") return otherNetwork.id === "kah";
+      if (network.id === "passet") return otherNetwork.id === "paseoPassetHub";
+      if (network.id === "wah") return otherNetwork.id === "westendAssetHub";
+      if (network.id === "kah") return otherNetwork.id === "kusamaAssetHub";
       return false;
     });
 
@@ -172,7 +171,7 @@ export function TokenBridge() {
       setFromNetwork(correspondingFromNetwork);
       setSelectedToken({
         symbol: correspondingFromNetwork.symbol,
-        name: `${correspondingFromNetwork.name} Token`,
+        name: getTokenName(correspondingFromNetwork),
         price: "$",
         chainIconUrl:
           CHAINS[correspondingFromNetwork.id as keyof typeof CHAINS]
@@ -242,17 +241,14 @@ export function TokenBridge() {
     setCurrentTxHash(null);
 
     try {
-      // Check if account is already mapped
       const isAlreadyMapped = await isMappedAccount();
       
       if (isAlreadyMapped) {
-        // Account is already mapped, skip map step and go directly to deposit
         setTransactionSteps({
           mapAccount: { status: "completed", txHash: null },
           call: { status: "pending", txHash: null },
         });
 
-        // Step: Deposit Account (skip mapping)
         setTransactionSteps((prev) => ({
           ...prev,
           call: { status: "active", txHash: null },
@@ -269,13 +265,11 @@ export function TokenBridge() {
         }));
         setCurrentTxHash(depositResult.transactionHash);
       } else {
-        // Account is not mapped, need to map first then deposit
         setTransactionSteps({
           mapAccount: { status: "pending", txHash: null },
           call: { status: "pending", txHash: null },
         });
 
-        // Step 1: Map Account
         setTransactionSteps((prev) => ({
           ...prev,
           mapAccount: { status: "active", txHash: null },
@@ -292,7 +286,6 @@ export function TokenBridge() {
         }));
         setCurrentTxHash(mapResult.transactionHash);
 
-        // Step 2: Deposit Account
         setTransactionSteps((prev) => ({
           ...prev,
           call: { status: "active", txHash: null },
@@ -309,8 +302,6 @@ export function TokenBridge() {
         }));
         setCurrentTxHash(depositResult.transactionHash);
       }
-
-      // Success - close dialog and refresh balance
       setTimeout(() => {
         setShowTransactionDialog(false);
         setIsBridging(false);
@@ -404,9 +395,6 @@ export function TokenBridge() {
                             if (nextElement) nextElement.style.display = "flex";
                           }}
                         />
-                        {/* <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
-                          {fromNetwork.symbol[0]}
-                        </div> */}
                       </div>
                       <div className="flex-1">
                         <div className="font-medium">{fromNetwork.name}</div>
@@ -419,7 +407,7 @@ export function TokenBridge() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-80">
                     <ScrollArea className="h-64">
-                      {FROM_NETWORKS.map((network) => (
+                      {(isReversed ? TO_NETWORKS : FROM_NETWORKS).map((network) => (
                         <DropdownMenuItem
                           key={network.id}
                           onClick={() => handleFromNetworkSelect(network)}
@@ -439,9 +427,6 @@ export function TokenBridge() {
                                   nextElement.style.display = "flex";
                               }}
                             />
-                            {/* <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
-                              {network.symbol[0]}
-                            </div> */}
                           </div>
                           <div className="flex-1">
                             <div className="font-medium">{network.name}</div>
@@ -474,9 +459,6 @@ export function TokenBridge() {
                         if (nextElement) nextElement.style.display = "flex";
                       }}
                     />
-                    {/* <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold hidden">
-                      {selectedToken.symbol[0]}
-                    </div> */}
                   </div>
                   <div className="flex-1">
                     <div className="font-medium">{selectedToken.symbol}</div>
@@ -597,7 +579,7 @@ export function TokenBridge() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-80">
                     <ScrollArea className="h-64">
-                      {TO_NETWORKS.map((network) => (
+                      {(isReversed ? FROM_NETWORKS : TO_NETWORKS).map((network) => (
                         <DropdownMenuItem
                           key={network.id}
                           onClick={() => handleToNetworkSelect(network)}
@@ -617,9 +599,6 @@ export function TokenBridge() {
                                   nextElement.style.display = "flex";
                               }}
                             />
-                            {/* <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
-                              {network.symbol[0]}
-                            </div> */}
                           </div>
                           <div className="flex-1">
                             <div className="font-medium">{network.name}</div>
@@ -652,9 +631,6 @@ export function TokenBridge() {
                         if (nextElement) nextElement.style.display = "flex";
                       }}
                     />
-                    {/* <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold hidden">
-                      {selectedToken.symbol[0]}
-                    </div> */}
                   </div>
                   <div className="flex-1">
                     <div className="font-medium">{selectedToken.symbol}</div>
