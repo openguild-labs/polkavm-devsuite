@@ -43,6 +43,8 @@ import { useAccount, useDisconnect } from "@luno-kit/react";
 import { createPublicClient, http, formatEther } from 'viem';
 import { useDisconnect as useEvmDisconnect } from 'wagmi';
 import { useEffect } from "react";
+import { createClient as createSubstrateClient } from "polkadot-api";
+import { getWsProvider } from "polkadot-api/ws-provider/web";
 
 export function TokenBridge() {
   const { address } = useAccount();
@@ -55,6 +57,7 @@ export function TokenBridge() {
     mapAccount,
     depositAccount,
     isMappedAccount,
+    client,
   } = usePapiClient();
   const { disconnect: disconnectEvm } = useEvmDisconnect();
   const { disconnect: disconnectSubstrate } = useDisconnect();
@@ -85,6 +88,8 @@ export function TokenBridge() {
   const [bridgeError, setBridgeError] = useState<string | null>(null);
   const [evmBalance, setEvmBalance] = useState<string | null>(null);
   const [isLoadingEvmBalance, setIsLoadingEvmBalance] = useState(false);
+  const [substrateBalance, setSubstrateBalance] = useState<string | null>(null);
+  const [isLoadingSubstrateBalance, setIsLoadingSubstrateBalance] = useState(false);
   const [showTransactionDialog, setShowTransactionDialog] = useState(false);
   const [transactionSteps, setTransactionSteps] = useState({
     mapAccount: {
@@ -112,7 +117,7 @@ export function TokenBridge() {
     // Determine if we're switching FROM substrate TO polkavm or vice versa
     const isFromSubstrate = FROM_NETWORKS.some(n => n.id === fromNetwork.id);
     const isToPolkaVM = TO_NETWORKS.some(n => n.id === toNetwork.id);
-    
+
     // Disconnect appropriate wallet
     if (isFromSubstrate && isToPolkaVM) {
       // Switching from Substrate to PolkaVM, disconnect Substrate wallet
@@ -121,20 +126,20 @@ export function TokenBridge() {
       // Switching from PolkaVM to Substrate, disconnect EVM wallet
       disconnectEvm();
     }
-    
+
     setIsReversed(!isReversed);
-    
+
     const tempFrom = fromNetwork;
     setFromNetwork(toNetwork);
     setToNetwork(tempFrom);
-    
+
     setSelectedToken({
       symbol: toNetwork.symbol,
       name: getTokenName(toNetwork),
       price: "$",
       chainIconUrl: toNetwork.chainIconUrl,
     });
-    
+
     if (address) {
       switchChain(toNetwork.id);
     }
@@ -252,12 +257,58 @@ export function TokenBridge() {
     }
   };
 
+  const fetchSubstrateBalance = async (address: string, toNetworkId: string) => {
+    if (!isValidSubstrateAddress(address)) return;
+
+    setIsLoadingSubstrateBalance(true);
+    try {
+      // Find the corresponding chain for the TO network
+      const chain = Object.values(CHAINS).find(chain => chain.id === toNetworkId);
+      if (!chain) return;
+
+      console.log("Initializing client for chain:", chain.name);
+
+      const substrateClient = createSubstrateClient(
+        getWsProvider(chain.rpcUrls.webSocket[0], (_status) => {
+          switch (_status.type) {
+            case 0:
+              console.info('⚫️ Connecting to ==> ', chain.name);
+              break;
+          }
+        })
+      );
+      // Fetch balance using the current client and chain
+      const accountInfo = await (substrateClient as any).getTypedApi(chain.descriptors).query.System.Account.getValue(address);
+
+      const decimals = chain.nativeCurrency.decimals;
+      const total = BigInt(accountInfo.data.free) - BigInt(accountInfo.data.frozen || 0);
+      const formattedTotal = (Number(total) / 10 ** decimals).toFixed(4);
+
+      setSubstrateBalance(formattedTotal);
+    } catch (error) {
+      console.error("Failed to fetch Substrate balance:", error);
+      setSubstrateBalance(null);
+    } finally {
+      setIsLoadingSubstrateBalance(false);
+    }
+  };
+
   useEffect(() => {
     const validateAddress = getAddressValidation();
     if (recipientAddress && validateAddress(recipientAddress)) {
-      fetchEvmBalance(recipientAddress, toNetwork.id);
+      const isToPolkaVM = TO_NETWORKS.some(network => network.id === toNetwork.id);
+      if (isToPolkaVM) {
+        // TO network is PolkaVM, fetch EVM balance
+        fetchEvmBalance(recipientAddress, toNetwork.id);
+        setSubstrateBalance(null);
+      } else {
+        // TO network is Substrate, fetch Substrate balance
+        fetchSubstrateBalance(recipientAddress, toNetwork.id);
+        setEvmBalance(null);
+      }
     } else {
       setEvmBalance(null);
+      setSubstrateBalance(null);
     }
   }, [recipientAddress, toNetwork.id, fromNetwork.id]);
 
@@ -280,7 +331,7 @@ export function TokenBridge() {
 
     try {
       const isAlreadyMapped = await isMappedAccount();
-      
+
       if (isAlreadyMapped) {
         setTransactionSteps({
           mapAccount: { status: "completed", txHash: null },
@@ -552,8 +603,8 @@ export function TokenBridge() {
                   {loadingBalance
                     ? "Loading..."
                     : address
-                    ? `${balance.formattedTotal} ${fromNetwork.symbol}`
-                    : "Connect wallet"}
+                      ? `${balance.formattedTotal} ${fromNetwork.symbol}`
+                      : "Connect wallet"}
                 </span>
                 <Button
                   variant="ghost"
@@ -713,13 +764,12 @@ export function TokenBridge() {
                 placeholder={getAddressPlaceholder()}
                 value={recipientAddress}
                 onChange={(e) => setRecipientAddress(e.target.value)}
-                className={`pr-12 ${
-                  recipientAddress && !getAddressValidation()(recipientAddress)
+                className={`pr-12 ${recipientAddress && !getAddressValidation()(recipientAddress)
                     ? "border-red-500 focus:border-red-500"
                     : recipientAddress && getAddressValidation()(recipientAddress)
-                    ? "border-green-500 focus:border-green-500"
-                    : ""
-                }`}
+                      ? "border-green-500 focus:border-green-500"
+                      : ""
+                  }`}
               />
               {recipientAddress && (
                 <Button
@@ -746,15 +796,33 @@ export function TokenBridge() {
             {recipientAddress && getAddressValidation()(recipientAddress) && (
               <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <span>Balance on {toNetwork.name}:</span>
-                {isLoadingEvmBalance ? (
-                  <span>Loading...</span>
-                ) : evmBalance !== null ? (
-                  <span className="font-medium text-primary">
-                    {parseFloat(evmBalance).toFixed(4)} {toNetwork.symbol}
-                  </span>
-                ) : (
-                  <span>0.0000 {toNetwork.symbol}</span>
-                )}
+                {(() => {
+                  const isToPolkaVM = TO_NETWORKS.some(network => network.id === toNetwork.id);
+
+                  if (isToPolkaVM) {
+                    // TO network is PolkaVM, show EVM balance
+                    return isLoadingEvmBalance ? (
+                      <span>Loading...</span>
+                    ) : evmBalance !== null ? (
+                      <span className="font-medium text-primary">
+                        {parseFloat(evmBalance).toFixed(4)} {toNetwork.symbol}
+                      </span>
+                    ) : (
+                      <span>0.0000 {toNetwork.symbol}</span>
+                    );
+                  } else {
+                    // TO network is Substrate, show Substrate balance
+                    return isLoadingSubstrateBalance ? (
+                      <span>Loading...</span>
+                    ) : substrateBalance !== null ? (
+                      <span className="font-medium text-primary">
+                        {substrateBalance} {toNetwork.symbol}
+                      </span>
+                    ) : (
+                      <span>0.0000 {toNetwork.symbol}</span>
+                    );
+                  }
+                })()}
               </div>
             )}
 
@@ -777,12 +845,12 @@ export function TokenBridge() {
             {isBridging
               ? "🔄 Bridging..."
               : !recipientAddress
-              ? "Enter Recipient Address"
-              : !getAddressValidation()(recipientAddress)
-              ? `Invalid ${getAddressLabel()}`
-              : !amount
-              ? "Enter Amount"
-              : `Bridge ${amount} ${selectedToken.symbol}`}
+                ? "Enter Recipient Address"
+                : !getAddressValidation()(recipientAddress)
+                  ? `Invalid ${getAddressLabel()}`
+                  : !amount
+                    ? "Enter Amount"
+                    : `Bridge ${amount} ${selectedToken.symbol}`}
           </Button>
         </Card>
       </div>
@@ -836,13 +904,12 @@ export function TokenBridge() {
                   <div className="w-6 h-6 rounded-full border-2 border-gray-300" />
                 )}
                 <span
-                  className={`text-sm ${
-                    transactionSteps.mapAccount.status === "active"
+                  className={`text-sm ${transactionSteps.mapAccount.status === "active"
                       ? "text-blue-600 font-medium"
                       : transactionSteps.mapAccount.status === "completed"
-                      ? "text-green-600"
-                      : "text-gray-500"
-                  }`}>
+                        ? "text-green-600"
+                        : "text-gray-500"
+                    }`}>
                   Map Account
                 </span>
               </div>
@@ -861,13 +928,12 @@ export function TokenBridge() {
                   <div className="w-6 h-6 rounded-full border-2 border-gray-300" />
                 )}
                 <span
-                  className={`text-sm ${
-                    transactionSteps.call.status === "active"
+                  className={`text-sm ${transactionSteps.call.status === "active"
                       ? "text-blue-600 font-medium"
                       : transactionSteps.call.status === "completed"
-                      ? "text-green-600"
-                      : "text-gray-500"
-                  }`}>
+                        ? "text-green-600"
+                        : "text-gray-500"
+                    }`}>
                   Bridge Call
                 </span>
               </div>
