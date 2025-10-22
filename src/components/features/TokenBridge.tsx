@@ -192,6 +192,25 @@ export function TokenBridge() {
     return /^0x[a-fA-F0-9]{40}$/.test(address);
   };
 
+  const isValidSubstrateAddress = (address: string) => {
+    return /^[1-9A-HJ-NP-Za-km-z]{47,48}$/.test(address);
+  };
+
+  const getAddressValidation = () => {
+    const isFromPolkaVM = TO_NETWORKS.some(network => network.id === fromNetwork.id);
+    return isFromPolkaVM ? isValidSubstrateAddress : isValidEvmAddress;
+  };
+
+  const getAddressPlaceholder = () => {
+    const isFromPolkaVM = TO_NETWORKS.some(network => network.id === fromNetwork.id);
+    return isFromPolkaVM ? "Your Substrate address here" : "Your EVM address here";
+  };
+
+  const getAddressLabel = () => {
+    const isFromPolkaVM = TO_NETWORKS.some(network => network.id === fromNetwork.id);
+    return isFromPolkaVM ? "Substrate Address" : "PolkaVM Address";
+  };
+
   const fetchEvmBalance = async (address: string, toNetworkId: string) => {
     if (!isValidEvmAddress(address)) return;
 
@@ -217,19 +236,21 @@ export function TokenBridge() {
   };
 
   useEffect(() => {
-    if (recipientAddress && isValidEvmAddress(recipientAddress)) {
+    const validateAddress = getAddressValidation();
+    if (recipientAddress && validateAddress(recipientAddress)) {
       fetchEvmBalance(recipientAddress, toNetwork.id);
     } else {
       setEvmBalance(null);
     }
-  }, [recipientAddress, toNetwork.id]);
+  }, [recipientAddress, toNetwork.id, fromNetwork.id]);
 
   const bridgeTokens = async () => {
+    const validateAddress = getAddressValidation();
     if (
       !address ||
       !recipientAddress ||
       !amount ||
-      !isValidEvmAddress(recipientAddress)
+      !validateAddress(recipientAddress)
     ) {
       setBridgeError("Please fill in all required fields with valid values");
       return;
@@ -658,20 +679,20 @@ export function TokenBridge() {
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">Recipient Address</label>
               <Badge variant="outline" className="text-xs">
-                PolkaVM Address
+                {getAddressLabel()}
               </Badge>
             </div>
 
             <div className="relative">
               <Input
                 type="text"
-                placeholder="Your EVM address here"
+                placeholder={getAddressPlaceholder()}
                 value={recipientAddress}
                 onChange={(e) => setRecipientAddress(e.target.value)}
                 className={`pr-12 ${
-                  recipientAddress && !isValidEvmAddress(recipientAddress)
+                  recipientAddress && !getAddressValidation()(recipientAddress)
                     ? "border-red-500 focus:border-red-500"
-                    : recipientAddress && isValidEvmAddress(recipientAddress)
+                    : recipientAddress && getAddressValidation()(recipientAddress)
                     ? "border-green-500 focus:border-green-500"
                     : ""
                 }`}
@@ -691,14 +712,14 @@ export function TokenBridge() {
               )}
             </div>
 
-            {recipientAddress && !isValidEvmAddress(recipientAddress) && (
+            {recipientAddress && !getAddressValidation()(recipientAddress) && (
               <p className="text-sm text-red-500">
-                Please enter a valid EVM address (0x...)
+                Please enter a valid {getAddressLabel().toLowerCase()}
               </p>
             )}
 
-            {/* EVM Balance Display */}
-            {recipientAddress && isValidEvmAddress(recipientAddress) && (
+            {/* Balance Display */}
+            {recipientAddress && getAddressValidation()(recipientAddress) && (
               <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <span>Balance on {toNetwork.name}:</span>
                 {isLoadingEvmBalance ? (
@@ -725,7 +746,7 @@ export function TokenBridge() {
             disabled={
               !amount ||
               !recipientAddress ||
-              !isValidEvmAddress(recipientAddress) ||
+              !getAddressValidation()(recipientAddress) ||
               isBridging
             }
             onClick={bridgeTokens}>
@@ -733,8 +754,8 @@ export function TokenBridge() {
               ? "🔄 Bridging..."
               : !recipientAddress
               ? "Enter Recipient Address"
-              : !isValidEvmAddress(recipientAddress)
-              ? "Invalid EVM Address"
+              : !getAddressValidation()(recipientAddress)
+              ? `Invalid ${getAddressLabel()}`
               : !amount
               ? "Enter Amount"
               : `Bridge ${amount} ${selectedToken.symbol}`}
