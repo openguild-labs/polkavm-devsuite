@@ -45,6 +45,8 @@ import { useDisconnect as useEvmDisconnect } from 'wagmi';
 import { useEffect } from "react";
 import { createClient as createSubstrateClient } from "polkadot-api";
 import { getWsProvider } from "polkadot-api/ws-provider/web";
+import { useEvmCall } from "@/hooks/useEvmCall";
+import { convertSS58ToH160 } from "@/lib/utils";
 
 export function TokenBridge() {
   const { address } = useAccount();
@@ -103,6 +105,13 @@ export function TokenBridge() {
   });
   const [currentTxHash, setCurrentTxHash] = useState<string | null>(null);
   const [isReversed, setIsReversed] = useState(false);
+  const [isPolkaVMToSubstrate, setIsPolkaVMToSubstrate] = useState(false);
+
+  // EVM call hook for PolkaVM to Substrate bridging
+  const evmCall = useEvmCall({
+    to: recipientAddress ? convertSS58ToH160(recipientAddress) as `0x${string}` : "0x0000000000000000000000000000000000000000" as `0x${string}`,
+    value: amount || "0"
+  });
 
   const getTokenName = (network: any) => {
     if (network.displayName) {
@@ -219,18 +228,18 @@ export function TokenBridge() {
   };
 
   const getAddressValidation = () => {
-    const isFromPolkaVM = TO_NETWORKS.some(network => network.id === fromNetwork.id);
-    return isFromPolkaVM ? isValidSubstrateAddress : isValidEvmAddress;
+    const isToPolkaVM = TO_NETWORKS.some(network => network.id === toNetwork.id);
+    return isToPolkaVM ? isValidEvmAddress : isValidSubstrateAddress;
   };
 
   const getAddressPlaceholder = () => {
-    const isFromPolkaVM = TO_NETWORKS.some(network => network.id === fromNetwork.id);
-    return isFromPolkaVM ? "Your Substrate address here" : "Your EVM address here";
+    const isToPolkaVM = TO_NETWORKS.some(network => network.id === toNetwork.id);
+    return isToPolkaVM ? "Your EVM address here" : "Your Substrate address here";
   };
 
   const getAddressLabel = () => {
-    const isFromPolkaVM = TO_NETWORKS.some(network => network.id === fromNetwork.id);
-    return isFromPolkaVM ? "Substrate Address" : "PolkaVM Address";
+    const isToPolkaVM = TO_NETWORKS.some(network => network.id === toNetwork.id);
+    return isToPolkaVM ? "PolkaVM Address" : "Substrate Address";
   };
 
   const fetchEvmBalance = async (address: string, toNetworkId: string) => {
@@ -330,67 +339,101 @@ export function TokenBridge() {
     setCurrentTxHash(null);
 
     try {
-      const isAlreadyMapped = await isMappedAccount();
+      // Determine bridge direction
+      const isFromPolkaVM = TO_NETWORKS.some(network => network.id === fromNetwork.id);
+      const isToSubstrate = FROM_NETWORKS.some(network => network.id === toNetwork.id);
 
-      if (isAlreadyMapped) {
+      if (isFromPolkaVM && isToSubstrate) {
+        // PolkaVM to Substrate bridge using EVM call - single step only
+        setIsPolkaVMToSubstrate(true);
         setTransactionSteps({
           mapAccount: { status: "completed", txHash: null },
-          call: { status: "pending", txHash: null },
+          call: { status: "active", txHash: null },
         });
 
-        setTransactionSteps((prev) => ({
-          ...prev,
-          call: { status: "active", txHash: null },
-        }));
-
-        const depositResult = await depositAccount(recipientAddress, amount);
+        await evmCall.execute();
+        
+        // Get transaction hash from the hook state
+        const txHash = evmCall.txHash;
+        if (!txHash) {
+          throw new Error("Transaction hash not available");
+        }
+        
+        setCurrentTxHash(txHash);
 
         setTransactionSteps((prev) => ({
           ...prev,
           call: {
             status: "completed",
-            txHash: depositResult.transactionHash,
+            txHash: txHash,
           },
         }));
-        setCurrentTxHash(depositResult.transactionHash);
       } else {
-        setTransactionSteps({
-          mapAccount: { status: "pending", txHash: null },
-          call: { status: "pending", txHash: null },
-        });
+        // Substrate to PolkaVM bridge (existing logic)
+        setIsPolkaVMToSubstrate(false);
+        const isAlreadyMapped = await isMappedAccount();
 
-        setTransactionSteps((prev) => ({
-          ...prev,
-          mapAccount: { status: "active", txHash: null },
-        }));
+        if (isAlreadyMapped) {
+          setTransactionSteps({
+            mapAccount: { status: "completed", txHash: null },
+            call: { status: "pending", txHash: null },
+          });
 
-        const mapResult = await mapAccount();
+          setTransactionSteps((prev) => ({
+            ...prev,
+            call: { status: "active", txHash: null },
+          }));
 
-        setTransactionSteps((prev) => ({
-          ...prev,
-          mapAccount: {
-            status: "completed",
-            txHash: mapResult.transactionHash,
-          },
-        }));
-        setCurrentTxHash(mapResult.transactionHash);
+          const depositResult = await depositAccount(recipientAddress, amount);
 
-        setTransactionSteps((prev) => ({
-          ...prev,
-          call: { status: "active", txHash: null },
-        }));
+          setTransactionSteps((prev) => ({
+            ...prev,
+            call: {
+              status: "completed",
+              txHash: depositResult.transactionHash,
+            },
+          }));
+          setCurrentTxHash(depositResult.transactionHash);
+        } else {
+          setTransactionSteps({
+            mapAccount: { status: "pending", txHash: null },
+            call: { status: "pending", txHash: null },
+          });
 
-        const depositResult = await depositAccount(recipientAddress, amount);
+          setTransactionSteps((prev) => ({
+            ...prev,
+            mapAccount: { status: "active", txHash: null },
+          }));
 
-        setTransactionSteps((prev) => ({
-          ...prev,
-          call: {
-            status: "completed",
-            txHash: depositResult.transactionHash,
-          },
-        }));
-        setCurrentTxHash(depositResult.transactionHash);
+          const mapResult = await mapAccount();
+
+          setTransactionSteps((prev) => ({
+            ...prev,
+            mapAccount: {
+              status: "completed",
+              txHash: mapResult.transactionHash,
+            },
+          }));
+          setCurrentTxHash(mapResult.transactionHash);
+
+          setTransactionSteps((prev) => ({
+            ...prev,
+            call: { status: "active", txHash: null },
+          }));
+
+          const depositResult = await depositAccount(recipientAddress, amount);
+
+          setTransactionSteps((prev) => ({
+            ...prev,
+            call: {
+              status: "completed",
+              txHash: depositResult.transactionHash,
+            },
+          }));
+          setCurrentTxHash(depositResult.transactionHash);
+        }
       }
+      
       setTimeout(() => {
         setShowTransactionDialog(false);
         setIsBridging(false);
@@ -890,7 +933,8 @@ export function TokenBridge() {
 
             {/* Transaction Steps */}
             <div className="space-y-3">
-              {/* Map Account Step */}
+              {/* Map Account Step - Only show for Substrate to PolkaVM */}
+              {!isPolkaVMToSubstrate && (
               <div className="flex items-center gap-3">
                 {transactionSteps.mapAccount.status === "completed" ? (
                   <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
@@ -913,6 +957,7 @@ export function TokenBridge() {
                   Map Account
                 </span>
               </div>
+              )}
 
               {/* Call Step */}
               <div className="flex items-center gap-3">

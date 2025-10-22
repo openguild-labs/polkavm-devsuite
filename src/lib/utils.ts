@@ -30,8 +30,13 @@ export function convertSs58toPublicKey(ss58Address: string): Uint8Array {
 }
 
 
-export function convertPublicKeyToH160(address: string): string {
-  const cleanHex = address.startsWith('0x') ? address.slice(2) : address;
+export function convertSS58ToH160(ss58Address: string): string {
+  const publicKey = decodeAddress(ss58Address);
+  
+  // Convert Uint8Array to hex string
+  const cleanHex = Array.from(publicKey)
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('');
   
   if (cleanHex.length !== 64) {
     throw new Error(`Invalid Substrate account: expected 64 hex characters, got ${cleanHex.length}`);

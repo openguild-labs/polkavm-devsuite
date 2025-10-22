@@ -1,7 +1,7 @@
 'use client';
 
 import { RainbowKitProvider, connectorsForWallets } from '@rainbow-me/rainbowkit';
-import { metaMaskWallet, walletConnectWallet } from '@rainbow-me/rainbowkit/wallets';
+import { metaMaskWallet } from '@rainbow-me/rainbowkit/wallets';
 import { createConfig, WagmiProvider as WagmiProviderBase } from 'wagmi';
 import { http } from 'viem';
 import { POLKAVM_RAINBOW_CHAINS } from '@/constants/polkavm-chains';
@@ -15,7 +15,7 @@ const connectors = connectorsForWallets([
   },
 ], {
   appName: 'PolkaVM Bridge',
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '',
+  projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || '',
 });
 
 const wagmiConfig = createConfig({
