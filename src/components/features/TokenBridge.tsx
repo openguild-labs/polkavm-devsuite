@@ -40,6 +40,7 @@ import {
 } from "@/constants";
 import { usePapiClient } from "@/hooks/usePapiClient";
 import { useAccount, useDisconnect } from "@luno-kit/react";
+import { useAccount as useEvmAccount} from "wagmi";
 import { createPublicClient, http, formatEther } from 'viem';
 import { useDisconnect as useEvmDisconnect } from 'wagmi';
 import { useEffect } from "react";
@@ -50,6 +51,7 @@ import { convertSS58ToH160 } from "@/lib/utils";
 
 export function TokenBridge() {
   const { address } = useAccount();
+  const {address: evmAddress} = useEvmAccount();
   const {
     balance,
     loadingBalance,
@@ -108,9 +110,31 @@ export function TokenBridge() {
   const [isPolkaVMToSubstrate, setIsPolkaVMToSubstrate] = useState(false);
 
   // EVM call hook for PolkaVM to Substrate bridging
+  // Only initialize evmCall for PolkaVM to Substrate transfers
+  const isFromPolkaVM = TO_NETWORKS.some(network => network.id === fromNetwork.id);
+  const isToSubstrate = FROM_NETWORKS.some(network => network.id === toNetwork.id);
+
+  console.log("🔧 EVM Call initialization:");
+  console.log("- isFromPolkaVM:", isFromPolkaVM);
+  console.log("- isToSubstrate:", isToSubstrate);
+  console.log("- recipientAddress:", recipientAddress);
+  console.log("- amount:", amount);
+
   const evmCall = useEvmCall({
-    to: recipientAddress ? convertSS58ToH160(recipientAddress) as `0x${string}` : "0x0000000000000000000000000000000000000000" as `0x${string}`,
+    to: (isFromPolkaVM && isToSubstrate && recipientAddress)
+      ? convertSS58ToH160(recipientAddress) as `0x${string}`
+      : "0x0000000000000000000000000000000000000000" as `0x${string}`,
     value: amount || "0"
+  });
+
+  console.log("📊 EVM Call state:", {
+    to: evmCall.to,
+    value: evmCall.value,
+    txHash: evmCall.txHash,
+    isSending: evmCall.isSending,
+    isConfirming: evmCall.isConfirming,
+    isSuccess: evmCall.isSuccess,
+    error: evmCall.error
   });
 
   const getTokenName = (network: any) => {
@@ -229,6 +253,10 @@ export function TokenBridge() {
 
   const getAddressValidation = () => {
     const isToPolkaVM = TO_NETWORKS.some(network => network.id === toNetwork.id);
+
+    console.log("isToPolkaVM", isToPolkaVM);
+    console.log("isValidEvmAddress", isValidEvmAddress);
+    console.log("isValidSubstrateAddress", isValidSubstrateAddress);
     return isToPolkaVM ? isValidEvmAddress : isValidSubstrateAddress;
   };
 
@@ -323,8 +351,31 @@ export function TokenBridge() {
 
   const bridgeTokens = async () => {
     const validateAddress = getAddressValidation();
+    console.log("Validate Address:", validateAddress(recipientAddress));
+    console.log("Recipient Address:", recipientAddress);
+    console.log("Amount:", amount);
+    console.log("Address:", address);
+    // Determine bridge direction
+    const isFromPolkaVM = TO_NETWORKS.some(network => network.id === fromNetwork.id);
+    const isToSubstrate = FROM_NETWORKS.some(network => network.id === toNetwork.id);
+
+    if (isFromPolkaVM && isToSubstrate) {
+      if (!evmAddress) {
+        console.log("❌ No EVM address available for PolkaVM to Substrate bridge");
+        setBridgeError("Please connect your EVM wallet to bridge from PolkaVM to Substrate");
+        return;
+      }
+    }
+    else {
+      if(!address) {
+        console.log("❌ No Substrate address available for Substrate to PolkaVM bridge");
+        setBridgeError("Please connect your Substrate wallet to bridge from Substrate to PolkaVM");
+        return;
+      }
+    }
+
+    
     if (
-      !address ||
       !recipientAddress ||
       !amount ||
       !validateAddress(recipientAddress)
@@ -333,17 +384,25 @@ export function TokenBridge() {
       return;
     }
 
+    console.log("🚀 Starting bridge process...");
     setIsBridging(true);
     setBridgeError(null);
     setShowTransactionDialog(true);
     setCurrentTxHash(null);
 
     try {
-      // Determine bridge direction
-      const isFromPolkaVM = TO_NETWORKS.some(network => network.id === fromNetwork.id);
-      const isToSubstrate = FROM_NETWORKS.some(network => network.id === toNetwork.id);
+
+
+
+
+      console.log("🔍 Bridge direction check:");
+      console.log("- isFromPolkaVM:", isFromPolkaVM);
+      console.log("- isToSubstrate:", isToSubstrate);
+      console.log("- fromNetwork.id:", fromNetwork.id);
+      console.log("- toNetwork.id:", toNetwork.id);
 
       if (isFromPolkaVM && isToSubstrate) {
+        console.log("🌉 PolkaVM to Substrate bridge detected");
         // PolkaVM to Substrate bridge using EVM call - single step only
         setIsPolkaVMToSubstrate(true);
         setTransactionSteps({
@@ -351,23 +410,36 @@ export function TokenBridge() {
           call: { status: "active", txHash: null },
         });
 
-        await evmCall.execute();
-        
-        // Get transaction hash from the hook state
-        const txHash = evmCall.txHash;
-        if (!txHash) {
-          throw new Error("Transaction hash not available");
-        }
-        
-        setCurrentTxHash(txHash);
+        console.log("📞 Executing EVM call...");
+        console.log("- evmCall state before execution:", {
+          to: evmCall.to,
+          value: evmCall.value,
+          isReady: evmCall.isReady,
+          isLoading: evmCall.isLoading,
+          error: evmCall.error
+        });
+
+        const txHash = await evmCall.execute();
+        console.log("✅ EVM call executed, transaction hash received:", txHash);
+
+        setCurrentTxHash(txHash || null);
+        console.log("📝 Setting current transaction hash:", txHash);
+
+        // Wait for transaction receipt to confirm success
+        console.log("⏳ Waiting for transaction receipt...");
+        const receipt = await evmCall.waitForReceipt();
+
+        console.log("✅ Transaction receipt received:", receipt);
+        console.log("- Status:", receipt.status);
 
         setTransactionSteps((prev) => ({
           ...prev,
           call: {
             status: "completed",
-            txHash: txHash,
+            txHash: txHash || null,
           },
         }));
+        console.log("✅ Transaction steps updated to completed");
       } else {
         // Substrate to PolkaVM bridge (existing logic)
         setIsPolkaVMToSubstrate(false);
@@ -433,8 +505,10 @@ export function TokenBridge() {
           setCurrentTxHash(depositResult.transactionHash);
         }
       }
-      
+
+      console.log("🎉 Bridge process completed successfully!");
       setTimeout(() => {
+        console.log("🔄 Closing transaction dialog and resetting state...");
         setShowTransactionDialog(false);
         setIsBridging(false);
         refreshBalance();
@@ -808,10 +882,10 @@ export function TokenBridge() {
                 value={recipientAddress}
                 onChange={(e) => setRecipientAddress(e.target.value)}
                 className={`pr-12 ${recipientAddress && !getAddressValidation()(recipientAddress)
-                    ? "border-red-500 focus:border-red-500"
-                    : recipientAddress && getAddressValidation()(recipientAddress)
-                      ? "border-green-500 focus:border-green-500"
-                      : ""
+                  ? "border-red-500 focus:border-red-500"
+                  : recipientAddress && getAddressValidation()(recipientAddress)
+                    ? "border-green-500 focus:border-green-500"
+                    : ""
                   }`}
               />
               {recipientAddress && (
@@ -935,28 +1009,28 @@ export function TokenBridge() {
             <div className="space-y-3">
               {/* Map Account Step - Only show for Substrate to PolkaVM */}
               {!isPolkaVMToSubstrate && (
-              <div className="flex items-center gap-3">
-                {transactionSteps.mapAccount.status === "completed" ? (
-                  <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-                    <Check className="h-4 w-4 text-white" />
-                  </div>
-                ) : transactionSteps.mapAccount.status === "active" ? (
-                  <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
-                    <Loader2 className="h-4 w-4 text-white animate-spin" />
-                  </div>
-                ) : (
-                  <div className="w-6 h-6 rounded-full border-2 border-gray-300" />
-                )}
-                <span
-                  className={`text-sm ${transactionSteps.mapAccount.status === "active"
+                <div className="flex items-center gap-3">
+                  {transactionSteps.mapAccount.status === "completed" ? (
+                    <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                      <Check className="h-4 w-4 text-white" />
+                    </div>
+                  ) : transactionSteps.mapAccount.status === "active" ? (
+                    <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
+                      <Loader2 className="h-4 w-4 text-white animate-spin" />
+                    </div>
+                  ) : (
+                    <div className="w-6 h-6 rounded-full border-2 border-gray-300" />
+                  )}
+                  <span
+                    className={`text-sm ${transactionSteps.mapAccount.status === "active"
                       ? "text-blue-600 font-medium"
                       : transactionSteps.mapAccount.status === "completed"
                         ? "text-green-600"
                         : "text-gray-500"
-                    }`}>
-                  Map Account
-                </span>
-              </div>
+                      }`}>
+                    Map Account
+                  </span>
+                </div>
               )}
 
               {/* Call Step */}
@@ -974,10 +1048,10 @@ export function TokenBridge() {
                 )}
                 <span
                   className={`text-sm ${transactionSteps.call.status === "active"
-                      ? "text-blue-600 font-medium"
-                      : transactionSteps.call.status === "completed"
-                        ? "text-green-600"
-                        : "text-gray-500"
+                    ? "text-blue-600 font-medium"
+                    : transactionSteps.call.status === "completed"
+                      ? "text-green-600"
+                      : "text-gray-500"
                     }`}>
                   Bridge Call
                 </span>
@@ -985,11 +1059,11 @@ export function TokenBridge() {
             </div>
 
             {/* Status Message */}
-            {transactionSteps.mapAccount.status === "active" && (
+            {!isPolkaVMToSubstrate && transactionSteps.mapAccount.status === "active" && (
               <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                 <Loader2 className="h-4 w-4 text-yellow-600 animate-spin" />
                 <span className="text-sm text-yellow-800">
-                  Waiting for confirmation...
+                  Mapping account...
                 </span>
               </div>
             )}
@@ -997,7 +1071,7 @@ export function TokenBridge() {
               <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                 <Loader2 className="h-4 w-4 text-yellow-600 animate-spin" />
                 <span className="text-sm text-yellow-800">
-                  Waiting for confirmation...
+                  {isPolkaVMToSubstrate ? "Executing bridge call..." : "Waiting for confirmation..."}
                 </span>
               </div>
             )}
