@@ -525,26 +525,6 @@ export function TokenBridge() {
 
   return (
     <div className="min-h-screen network-grid">
-      {/* Header */}
-      <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Zap className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <h1 className="text-xl font-bold text-balance">PolkaVM Bridge</h1>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {TO_NETWORKS.some(network => network.id === fromNetwork.id) ? (
-              <EvmWalletConnect />
-            ) : (
-              <WalletConnect />
-            )}
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <div className="mx-auto px-4 py-8 max-w-2xl">
         <div className="text-center mb-8">
