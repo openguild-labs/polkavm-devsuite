@@ -1,11 +1,9 @@
-import CustomWalletConnect from "@/components/features/CustomWalletConnect"
-import { TokenBridge } from "@/components/features/TokenBridge"
+import HomePage from "./homepage/page"
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-background">
-      <CustomWalletConnect />
-      <TokenBridge />
+      <HomePage />
     </main>
   )
 }
