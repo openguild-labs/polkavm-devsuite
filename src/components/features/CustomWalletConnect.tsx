@@ -53,17 +53,30 @@ export default function CustomWalletConnect() {
             {!account ? (
               <button
                 onClick={handleOpen}
-                className="px-4 py-2 rounded-md text-white font-medium hover:bg-primary/20 transition-colors"
+                className="px-5 py-2.5 rounded-xl text-white font-semibold border border-white/20 
+                          bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/40
+                          transition-all shadow-sm hover:shadow-md"
               >
                 Connect Wallet
               </button>
             ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-white">{account.address.slice(0, 6)}…{account.address.slice(-4)}</span>
+              <div className="flex items-center gap-3">
+                {/*Address*/}
+                <span
+                  className="px-3 py-1.5 rounded-lg bg-white/10 text-white font-medium 
+                            border border-white/20 backdrop-blur-sm"
+                >
+                  {account.address.slice(0, 6)}…{account.address.slice(-4)}
+                </span>
+
+                {/*Disconnect*/}
                 <button
                   onClick={() => disconnect()}
                   disabled={isPending}
-                  className="px-3 py-1 rounded bg-card hover:bg-card-foreground text-white transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-red-300 font-medium 
+                            bg-red-500/10 border border-red-500/20
+                            hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-200
+                            transition-all disabled:opacity-50"
                 >
                   Disconnect
                 </button>
