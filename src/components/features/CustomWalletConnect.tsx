@@ -1,7 +1,8 @@
-"use client"
+'use client'
 
 import { useState } from "react"
-import { useAccount, useDisconnect } from "@luno-kit/react"
+import { useAccount as usePolkadotAccount, useDisconnect as usePolkadotDisconnect } from "@luno-kit/react"
+import { useAccount as useEvmAccount } from "wagmi"
 import { AnimatePresence, motion } from "framer-motion"
 import Image from "next/image"
 import { Zap } from "lucide-react"
@@ -10,20 +11,21 @@ import { ConnectButton as LunoConnectButton, useConnectModal as useLunoConnectMo
 import Link from "next/link"
 
 export default function CustomWalletConnect() {
-  const { account } = useAccount()
-  const { disconnect, isPending } = useDisconnect()
+  // Polkadot hooks
+  const { account: polkadotAccount } = usePolkadotAccount()
+  const { disconnect: disconnectPolkadot, isPending: isPendingPolkadot } = usePolkadotDisconnect()
 
-  const lunoConnectModal = useLunoConnectModal()
+  // Ethereum hooks
+  const { address: evmAddress } = useEvmAccount()
   const rainbowConnectModal = useRainbowConnectModal()
+  const lunoConnectModal = useLunoConnectModal()
 
   const [open, setOpen] = useState(false)
   const [network, setNetwork] = useState<null | "polkadot" | "ethereum">(null)
 
-  // Sidebar open/close
   const handleOpen = () => setOpen(true)
   const handleClose = () => setOpen(false)
 
-  // network
   const handleConnectPolkadot = () => {
     setNetwork("polkadot")
     setOpen(false)
@@ -37,7 +39,7 @@ export default function CustomWalletConnect() {
   }
 
   const handleDisconnect = () => {
-    disconnect()
+    if (network === "polkadot") disconnectPolkadot()
     setNetwork(null)
     handleClose()
   }
@@ -59,7 +61,7 @@ export default function CustomWalletConnect() {
 
           {/* Right */}
           <div className="flex items-center gap-4">
-            {!account ? (
+            {(!polkadotAccount && !evmAddress) ? (
               <button
                 onClick={handleOpen}
                 className="px-4 py-2 rounded-md text-white font-medium border-2 border-white transition-all duration-300 hover:border-primary hover:shadow-[0_0_15px_var(--primary)] focus:outline-none focus:ring-2 focus:ring-primary"
@@ -67,7 +69,6 @@ export default function CustomWalletConnect() {
                 Connect Wallet
               </button>
             ) : network === "polkadot" ? (
-              // LunoKit ConnectButton
               <LunoConnectButton
                 accountStatus="full"
                 chainStatus="full"
@@ -76,7 +77,6 @@ export default function CustomWalletConnect() {
                 className="bg-black text-black hover:text-black"
               />
             ) : network === "ethereum" ? (
-              // RainbowKit ConnectButton
               <RainbowKitConnectButton />
             ) : null}
           </div>
@@ -114,7 +114,7 @@ export default function CustomWalletConnect() {
               </div>
 
               {/* Network selection when not connected */}
-              {!account && (
+              {!polkadotAccount && !evmAddress && (
                 <div className="space-y-4 mt-2">
                   {/* Polkadot */}
                   <div className="flex items-center justify-between bg-[#15171C] p-4 rounded-2xl border border-white/5 token-card-hover">
@@ -153,16 +153,18 @@ export default function CustomWalletConnect() {
               )}
 
               {/* Connected info + Disconnect */}
-              {account && (
+              {(polkadotAccount || evmAddress) && (
                 <div className="mt-auto pt-6 border-t border-white/10">
                   <div className="flex items-center gap-3 mb-4">
                     {network === "polkadot" && <Image src="/wallets/polkadot.svg" alt="Polkadot" width={24} height={24} />}
                     {network === "ethereum" && <Image src="/wallets/ethereum.svg" alt="Ethereum" width={24} height={24} />}
-                    <span className="text-white font-medium">{account.address}</span>
+                    <span className="text-white font-medium">
+                      {network === "polkadot" ? polkadotAccount?.address : evmAddress}
+                    </span>
                   </div>
                   <button
                     onClick={handleDisconnect}
-                    disabled={isPending}
+                    disabled={network === "polkadot" ? isPendingPolkadot : false}
                     className="px-4 py-2 w-full bg-red-600 text-white rounded-md"
                   >
                     Disconnect
