@@ -1,98 +1,94 @@
-"use client"
+'use client'
 
 import { useState } from "react"
-import { useAccount, useConnect, useDisconnect } from "@luno-kit/react"
+import { useAccount as usePolkadotAccount, useDisconnect as usePolkadotDisconnect } from "@luno-kit/react"
+import { useAccount as useEvmAccount } from "wagmi"
 import { AnimatePresence, motion } from "framer-motion"
 import Image from "next/image"
-import { useConnectModal } from "@rainbow-me/rainbowkit" 
-import { useConnectModal as useLunoConnectModal } from '@luno-kit/ui';
 import { Zap } from "lucide-react"
+import { ConnectButton as RainbowKitConnectButton, useConnectModal as useRainbowConnectModal } from "@rainbow-me/rainbowkit"
+import { ConnectButton as LunoConnectButton, useConnectModal as useLunoConnectModal } from "@luno-kit/ui"
 import Link from "next/link"
 
 export default function CustomWalletConnect() {
-  const { account } = useAccount()
-  const { connect } = useConnect()
-  const { disconnect, isPending } = useDisconnect()
-  const { openConnectModal } = useConnectModal() 
+  // Polkadot hooks
+  const { account: polkadotAccount } = usePolkadotAccount()
+  const { disconnect: disconnectPolkadot, isPending: isPendingPolkadot } = usePolkadotDisconnect()
+
+  // Ethereum hooks
+  const { address: evmAddress } = useEvmAccount()
+  const rainbowConnectModal = useRainbowConnectModal()
+  const lunoConnectModal = useLunoConnectModal()
+
   const [open, setOpen] = useState(false)
-  const [subModal, setSubModal] = useState<null | "polkadot">(null)
-  const lunoConnectModal = useLunoConnectModal();
+  const [network, setNetwork] = useState<null | "polkadot" | "ethereum">(null)
 
   const handleOpen = () => setOpen(true)
-  const handleClose = () => {
-    setOpen(false)
-    setSubModal(null)
-  }
+  const handleClose = () => setOpen(false)
 
   const handleConnectPolkadot = () => {
-    setOpen(false); 
-    lunoConnectModal.open?.(); 
-  };
+    setNetwork("polkadot")
+    setOpen(false)
+    lunoConnectModal.open?.()
+  }
 
   const handleConnectEthereum = () => {
-    handleClose()      
-    openConnectModal?.() 
+    setNetwork("ethereum")
+    setOpen(false)
+    rainbowConnectModal.openConnectModal?.()
+  }
+
+  const handleDisconnect = () => {
+    if (network === "polkadot") disconnectPolkadot()
+    setNetwork(null)
+    handleClose()
   }
 
   return (
     <>
       {/* Header */}
-      <header className="h-16 sticky top-0 z-50 flex items-center bg-transparent">
-        <div className="container mx-auto px-4 flex items-center justify-between">
+      <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-50">
+        <div className="container mx-auto px-4 pt-2 pb-4 flex items-center justify-between">
           {/* Left */}
-          <Link href="/" className="flex items-center gap-3">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-3">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <Zap className="w-5 h-5 text-primary-foreground" />
               </div>
-              <h1 className="text-xl font-bold text-white">PolkaVM Tools</h1>
-            </div>
-          </Link>
+              <h1 className="text-xl font-bold text-balance">PolkaVM Bridge</h1>
+            </Link>
+          </div>
+
           {/* Right */}
           <div className="flex items-center gap-4">
-            {!account ? (
+            {(!polkadotAccount && !evmAddress) ? (
               <button
                 onClick={handleOpen}
-                className="px-5 py-2.5 rounded-xl text-white font-semibold border border-white/20 
-                          bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/40
-                          transition-all shadow-sm hover:shadow-md"
+                className="px-4 py-2 rounded-md text-white font-medium border-2 border-white transition-all duration-300 hover:border-primary hover:shadow-[0_0_15px_var(--primary)] focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 Connect Wallet
               </button>
-            ) : (
-              <div className="flex items-center gap-3">
-                {/*Address*/}
-                <span
-                  className="px-3 py-1.5 rounded-lg bg-white/10 text-white font-medium 
-                            border border-white/20 backdrop-blur-sm"
-                >
-                  {account.address.slice(0, 6)}…{account.address.slice(-4)}
-                </span>
-
-                {/*Disconnect*/}
-                <button
-                  onClick={() => disconnect()}
-                  disabled={isPending}
-                  className="px-3 py-1.5 rounded-lg text-red-300 font-medium 
-                            bg-red-500/10 border border-red-500/20
-                            hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-200
-                            transition-all disabled:opacity-50"
-                >
-                  Disconnect
-                </button>
-              </div>
-            )}
+            ) : network === "polkadot" ? (
+              <LunoConnectButton
+                accountStatus="full"
+                chainStatus="full"
+                showBalance={false}
+                displayPreference="name"
+                className="bg-black text-black hover:text-black"
+              />
+            ) : network === "ethereum" ? (
+              <RainbowKitConnectButton />
+            ) : null}
           </div>
         </div>
       </header>
 
-      {/* Sidebar Drawer */}
       <AnimatePresence>
         {open && (
           <>
             {/* Backdrop */}
             <motion.div
-              className="fixed inset-0 z-[9999]"
+              className="fixed inset-0 bg-black/50 z-[999999]"
               onClick={handleClose}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -101,54 +97,80 @@ export default function CustomWalletConnect() {
 
             {/* Sidebar */}
             <motion.div
-              className="fixed top-0 right-0 h-full w-[420px] z-[10000] p-6 flex flex-col bg-card border-l border-border rounded-l-xl"
+              className="fixed top-0 right-0 h-full w-[420px] bg-[#0F1115] z-[1000000] p-6 flex flex-col border-l border-white/10"
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "tween", duration: 0.28 }}
             >
-              {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-semibold text-white">Connect Your Wallet</h2>
-                <button onClick={handleClose} className="text-gray-400 hover:text-white text-xl">×</button>
+                <button
+                  onClick={handleClose}
+                  className="text-gray-400 hover:text-white text-xl"
+                >
+                  ×
+                </button>
               </div>
 
-              {/* Networks */}
-              <div className="space-y-4 mt-2">
-                {/* Polkadot */}
-                <div className="token-card-hover flex items-center justify-between bg-card p-4 rounded-2xl border border-border">
-                  <div className="flex items-center gap-3">
-                    <Image src="/wallets/polkadot.svg" alt="Polkadot" width={36} height={36} />
-                    <div>
-                      <div className="text-white font-medium">Polkadot</div>
-                      <div className="text-gray-400 text-xs">Use Polkadot-compatible wallets</div>
+              {/* Network selection when not connected */}
+              {!polkadotAccount && !evmAddress && (
+                <div className="space-y-4 mt-2">
+                  {/* Polkadot */}
+                  <div className="flex items-center justify-between bg-[#15171C] p-4 rounded-2xl border border-white/5 token-card-hover">
+                    <div className="flex items-center gap-3">
+                      <Image src="/wallets/polkadot.svg" alt="Polkadot" width={36} height={36} />
+                      <div>
+                        <div className="text-white font-medium">Polkadot</div>
+                        <div className="text-gray-400 text-xs">Use Polkadot-compatible wallets</div>
+                      </div>
                     </div>
+                    <button
+                      onClick={handleConnectPolkadot}
+                      className="px-4 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-sm"
+                    >
+                      Connect
+                    </button>
                   </div>
-                  <button
-                    onClick={handleConnectPolkadot}
-                    className="px-4 py-1.5 bg-primary/10 hover:bg-primary/20 rounded-xl text-sm text-white transition-colors"
-                  >
-                    Connect
-                  </button>
-                </div>
 
-                {/* Ethereum */}
-                <div className="token-card-hover flex items-center justify-between bg-card p-4 rounded-2xl border border-border">
-                  <div className="flex items-center gap-3">
-                    <Image src="/wallets/ethereum.svg" alt="Ethereum" width={36} height={36} />
-                    <div>
-                      <div className="text-white font-medium">Ethereum</div>
-                      <div className="text-gray-400 text-xs">Use EVM-compatible wallets</div>
+                  {/* Ethereum */}
+                  <div className="flex items-center justify-between bg-[#15171C] p-4 rounded-2xl border border-white/5 token-card-hover">
+                    <div className="flex items-center gap-3">
+                      <Image src="/wallets/ethereum.svg" alt="Ethereum" width={36} height={36} />
+                      <div>
+                        <div className="text-white font-medium">Ethereum</div>
+                        <div className="text-gray-400 text-xs">Use EVM-compatible wallets</div>
+                      </div>
                     </div>
+                    <button
+                      onClick={handleConnectEthereum}
+                      className="px-4 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-sm"
+                    >
+                      Connect
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Connected info + Disconnect */}
+              {(polkadotAccount || evmAddress) && (
+                <div className="mt-auto pt-6 border-t border-white/10">
+                  <div className="flex items-center gap-3 mb-4">
+                    {network === "polkadot" && <Image src="/wallets/polkadot.svg" alt="Polkadot" width={24} height={24} />}
+                    {network === "ethereum" && <Image src="/wallets/ethereum.svg" alt="Ethereum" width={24} height={24} />}
+                    <span className="text-white font-medium">
+                      {network === "polkadot" ? polkadotAccount?.address : evmAddress}
+                    </span>
                   </div>
                   <button
-                    onClick={handleConnectEthereum}
-                    className="px-4 py-1.5 bg-primary/10 hover:bg-primary/20 rounded-xl text-sm text-white transition-colors"
+                    onClick={handleDisconnect}
+                    disabled={network === "polkadot" ? isPendingPolkadot : false}
+                    className="px-4 py-2 w-full bg-red-600 text-white rounded-md"
                   >
-                    Connect
+                    Disconnect
                   </button>
                 </div>
-              </div>
+              )}
             </motion.div>
           </>
         )}
