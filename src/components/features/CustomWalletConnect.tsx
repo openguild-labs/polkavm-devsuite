@@ -9,6 +9,7 @@ import { Zap } from "lucide-react"
 import { ConnectButton as RainbowKitConnectButton, useConnectModal as useRainbowConnectModal } from "@rainbow-me/rainbowkit"
 import { ConnectButton as LunoConnectButton, useConnectModal as useLunoConnectModal } from "@luno-kit/ui"
 import Link from "next/link"
+import { useWalletNetwork } from "@/context/WalletContext"
 
 export default function CustomWalletConnect() {
   // Polkadot hooks
@@ -21,7 +22,7 @@ export default function CustomWalletConnect() {
   const lunoConnectModal = useLunoConnectModal()
 
   const [open, setOpen] = useState(false)
-  const [network, setNetwork] = useState<null | "polkadot" | "ethereum">(null)
+ const { network, setNetwork } = useWalletNetwork()
 
   const handleOpen = () => setOpen(true)
   const handleClose = () => setOpen(false)

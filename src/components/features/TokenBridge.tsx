@@ -48,6 +48,9 @@ import { createClient as createSubstrateClient } from "polkadot-api";
 import { getWsProvider } from "polkadot-api/ws-provider/web";
 import { useEvmCall } from "@/hooks/useEvmCall";
 import { convertSS58ToH160 } from "@/lib/utils";
+import { useWalletNetwork } from "@/context/WalletContext";
+import { ToNetworkDropdown } from "@/app/bridge/toNetworkDropdown";
+import { FromNetworkCard } from "@/app/bridge/fromNetworkCard";
 
 export function TokenBridge() {
   const { address } = useAccount();
@@ -65,7 +68,8 @@ export function TokenBridge() {
   } = usePapiClient();
   const { disconnect: disconnectEvm } = useEvmDisconnect();
   const { disconnect: disconnectSubstrate } = useDisconnect();
-
+  
+  const { network } = useWalletNetwork()
   const [fromNetwork, setFromNetwork] = useState(FROM_NETWORKS[0]);
   const [toNetwork, setToNetwork] = useState(() => {
     const correspondingToNetwork = TO_NETWORKS.find((toNetwork) => {
@@ -79,6 +83,16 @@ export function TokenBridge() {
     });
     return correspondingToNetwork || TO_NETWORKS[0];
   });
+
+  useEffect(() => {
+    if (network === "polkadot") setFromNetwork(FROM_NETWORKS[0]) // hoặc network Polkadot bạn muốn
+    if (network === "ethereum") setFromNetwork(FROM_NETWORKS[1]) // network Ethereum
+  }, [network])
+
+  const handleSelectToNetwork = (network: typeof TO_NETWORKS[0]) => {
+    setToNetwork(network)
+  }
+
   const [selectedToken, setSelectedToken] = useState({
     symbol: FROM_NETWORKS[0].symbol,
     name: `${FROM_NETWORKS[0].name} Token`,
@@ -568,71 +582,7 @@ export function TokenBridge() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Card className="p-4 bg-secondary/50 border-border/50">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                        <img
-                          src={fromNetwork.chainIconUrl}
-                          alt={fromNetwork.name}
-                          className="w-8 h-8 object-contain"
-                          onError={(e) => {
-                            const target = e.currentTarget as HTMLImageElement;
-                            target.style.display = "none";
-                            const nextElement =
-                              target.nextElementSibling as HTMLElement;
-                            if (nextElement) nextElement.style.display = "flex";
-                          }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium">{fromNetwork.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {fromNetwork.symbol}
-                        </div>
-                      </div>
-                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-80">
-                    <ScrollArea className="h-64">
-                      {(isReversed ? TO_NETWORKS : FROM_NETWORKS).map((network) => (
-                        <DropdownMenuItem
-                          key={network.id}
-                          onClick={() => handleFromNetworkSelect(network)}
-                          className="flex items-center gap-3 p-3 cursor-pointer">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                            <img
-                              src={network.chainIconUrl}
-                              alt={network.name}
-                              className="w-8 h-8 object-contain"
-                              onError={(e) => {
-                                const target =
-                                  e.currentTarget as HTMLImageElement;
-                                target.style.display = "none";
-                                const nextElement =
-                                  target.nextElementSibling as HTMLElement;
-                                if (nextElement)
-                                  nextElement.style.display = "flex";
-                              }}
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <div className="font-medium">{network.name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {network.symbol}
-                            </div>
-                          </div>
-                          {network.id === fromNetwork.id && (
-                            <Check className="w-4 h-4 text-primary" />
-                          )}
-                        </DropdownMenuItem>
-                      ))}
-                    </ScrollArea>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </Card>
+              <FromNetworkCard />
 
               <Card className="p-4 bg-secondary/50 border-border/50">
                 <div className="flex items-center gap-3 cursor-pointer">
@@ -737,74 +687,7 @@ export function TokenBridge() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Card className="p-4 bg-secondary/50 border-border/50">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                        <img
-                          src={toNetwork.chainIconUrl}
-                          alt={toNetwork.name}
-                          className="w-8 h-8 object-contain"
-                          onError={(e) => {
-                            const target = e.currentTarget as HTMLImageElement;
-                            target.style.display = "none";
-                            const nextElement =
-                              target.nextElementSibling as HTMLElement;
-                            if (nextElement) nextElement.style.display = "flex";
-                          }}
-                        />
-                        {/* <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 hidden">
-                          {toNetwork.symbol[0]}
-                        </div> */}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium">{toNetwork.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {toNetwork.symbol}
-                        </div>
-                      </div>
-                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-80">
-                    <ScrollArea className="h-64">
-                      {(isReversed ? FROM_NETWORKS : TO_NETWORKS).map((network) => (
-                        <DropdownMenuItem
-                          key={network.id}
-                          onClick={() => handleToNetworkSelect(network)}
-                          className="flex items-center gap-3 p-3 cursor-pointer">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                            <img
-                              src={network.chainIconUrl}
-                              alt={network.name}
-                              className="w-8 h-8 object-contain"
-                              onError={(e) => {
-                                const target =
-                                  e.currentTarget as HTMLImageElement;
-                                target.style.display = "none";
-                                const nextElement =
-                                  target.nextElementSibling as HTMLElement;
-                                if (nextElement)
-                                  nextElement.style.display = "flex";
-                              }}
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <div className="font-medium">{network.name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {network.symbol}
-                            </div>
-                          </div>
-                          {network.id === toNetwork.id && (
-                            <Check className="w-4 h-4 text-primary" />
-                          )}
-                        </DropdownMenuItem>
-                      ))}
-                    </ScrollArea>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </Card>
+              <ToNetworkDropdown onSelect={handleSelectToNetwork} />
 
               <Card className="p-4 bg-secondary/50 border-border/50">
                 <div className="flex items-center gap-3">

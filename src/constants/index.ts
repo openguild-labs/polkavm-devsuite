@@ -132,6 +132,7 @@ export interface ChainInfo {
   name: string
   symbol: string
   chainIconUrl: string
+  genesisHash?: string
 }
 
 
@@ -140,19 +141,22 @@ export const FROM_NETWORKS: ChainInfo[] = [
     id: CHAINS.paseoPassetHub.id,
     name: CHAINS.paseoPassetHub.name,
     symbol: CHAINS.paseoPassetHub.nativeCurrency.symbol,
-    chainIconUrl: CHAINS.paseoPassetHub.chainIconUrl
+    chainIconUrl: CHAINS.paseoPassetHub.chainIconUrl,
+    genesisHash: "0xfd974cf9eaf028f5e44b9fdd1949ab039c6cf9cc54449b0b60d71b042e79aeb6"
   },
   {
     id: CHAINS.westendAssetHub.id,
     name: CHAINS.westendAssetHub.name,
     symbol: CHAINS.westendAssetHub.nativeCurrency.symbol,
-    chainIconUrl: CHAINS.westendAssetHub.chainIconUrl
+    chainIconUrl: CHAINS.westendAssetHub.chainIconUrl,
+    genesisHash: "0x67f9723393ef76214df0118c34bbbd3dbebc8ed46a10973a8c969d48fe7598c9"
   },
   {
     id: CHAINS.kusamaAssetHub.id,
     name: CHAINS.kusamaAssetHub.name,
     symbol: CHAINS.kusamaAssetHub.nativeCurrency.symbol,
-    chainIconUrl: CHAINS.kusamaAssetHub.chainIconUrl
+    chainIconUrl: CHAINS.kusamaAssetHub.chainIconUrl,
+    genesisHash: "0x48239ef607d7928874027a43a67689209727dfb3d3dc5e5b03a39bdc2eda771a"
   }
 ]
 
