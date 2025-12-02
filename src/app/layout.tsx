@@ -8,6 +8,7 @@ import '@luno-kit/ui/styles.css';
 import '@rainbow-me/rainbowkit/styles.css';
 
 import './globals.css'
+import CustomWalletConnect from '@/components/features/CustomWalletConnect'
 
 export const metadata: Metadata = {
   title: 'PolkaVM DevTool',
@@ -25,6 +26,7 @@ export default function RootLayout({
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
         <SubstrateKitProviders>
           <WagmiProvider>
+            <CustomWalletConnect /> 
             {children}
             <Toaster />
           </WagmiProvider>
