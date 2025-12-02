@@ -79,7 +79,8 @@
     "vaul": "^0.9.9",
     "viem": "^2.38.3",
     "wagmi": "^2.18.2",
-    "zod": "3.25.67"
+    "zod": "3.25.67",
+    "zustand": "^5.0.9"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",

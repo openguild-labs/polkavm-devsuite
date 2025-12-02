@@ -1,8 +1,24 @@
+'use client'
 import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
+import { useSidebarStore } from "@/store/sidebarStore"
+import { useAccount as usePolkadotAccount, useDisconnect as usePolkadotDisconnect } from "@luno-kit/react"
+import { useAccount as useEvmAccount } from "wagmi"
 
 export default function HomePage() {
+  const { open } = useSidebarStore()
+  const { account: polkadotAccount } = usePolkadotAccount()
+  const { address: evmAddress } = useEvmAccount()
+
+  const handleMapClick = () => {
+  if (!polkadotAccount && !evmAddress) {
+    open("connect")
+  } else {
+    open("map")
+  }
+}
+
   return (
     <div className="min-h-screen network-grid">
       {/* Hero Section */}
@@ -35,8 +51,14 @@ export default function HomePage() {
           </Link>
 
           {/* Map Account Tool */}
-          <Link href="/map-account" className="group">
-            <Card className="token-card-hover p-8 rounded-xl bg-card border border-border h-full overflow-hidden relative">
+          
+           <Card
+            onClick={() => {
+              console.log("Map Account clicked", polkadotAccount)
+              handleMapClick()
+            }}
+              className="cursor-pointer token-card-hover p-8 rounded-xl bg-card border border-border h-full relative"
+            >
               <CardContent className="p-0 flex flex-col gap-4 relative z-10">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-white">Map Account</h2>
@@ -47,7 +69,7 @@ export default function HomePage() {
                 </p>
               </CardContent>
             </Card>
-          </Link>
+          
         </div>
       </div>
     </div>
