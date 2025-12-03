@@ -8,6 +8,7 @@ import '@luno-kit/ui/styles.css';
 import '@rainbow-me/rainbowkit/styles.css';
 
 import './globals.css'
+import { ToastProvider } from '@/providers/ToastProviders'
 
 export const metadata: Metadata = {
   title: 'PolkaVM DevTool',
@@ -23,12 +24,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <SubstrateKitProviders>
-          <WagmiProvider>
-            {children}
-            <Toaster />
-          </WagmiProvider>
-        </SubstrateKitProviders>
+        <ToastProvider>
+          <SubstrateKitProviders>
+            <WagmiProvider>
+              {children}
+              <Toaster />
+            </WagmiProvider>
+          </SubstrateKitProviders>
+        </ToastProvider>
       </body>
     </html>
   )
