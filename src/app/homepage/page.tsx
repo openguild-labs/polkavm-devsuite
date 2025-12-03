@@ -37,7 +37,7 @@ export default function HomePage() {
             PolkaVM Tools
           </h1>
           <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto">
-            Essential blockchain development tools for Ethereum and Substrate chains.
+            Essential blockchain development tools for PolkaVM and Substrate chains.
             Build smarter, debug faster, and ship with confidence.
           </p>
         </div>
@@ -48,7 +48,7 @@ export default function HomePage() {
           {/* Bridge Tool */}
           <ToolCard
             href="/bridge"
-            title="Bridge Substrate → PolkaVM"
+            title="Bridge Substrate ↔ PolkaVM"
             description="Transfer tokens from Substrate chains into PolkaVM with seamless integration."
           />
 

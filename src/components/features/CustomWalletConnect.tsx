@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion"
 import Image from "next/image"
 import { Zap } from "lucide-react"
-import { useAccount as usePolkadotAccount, useDisconnect as usePolkadotDisconnect } from "@luno-kit/react"
+import { useChain, useAccount as usePolkadotAccount, useDisconnect as usePolkadotDisconnect } from "@luno-kit/react"
 import { useAccount as useEvmAccount } from "wagmi"
 import { ConnectButton as RainbowKitConnectButton, useConnectModal as useRainbowConnectModal } from "@rainbow-me/rainbowkit"
 import { ConnectButton as LunoConnectButton, useConnectModal as useLunoConnectModal } from "@luno-kit/ui"
@@ -14,6 +14,7 @@ export default function CustomWalletConnect() {
   const { account: polkadotAccount } = usePolkadotAccount()
   const { disconnect: disconnectPolkadot, isPending: isPendingPolkadot } = usePolkadotDisconnect()
   const { address: evmAddress } = useEvmAccount()
+ 
 
   const rainbowConnectModal = useRainbowConnectModal()
   const lunoConnectModal = useLunoConnectModal()
