@@ -40,7 +40,7 @@ import {
 } from "@/constants";
 import { usePapiClient } from "@/hooks/usePapiClient";
 import { useAccount, useChain, useChains, useDisconnect } from "@luno-kit/react";
-import { useAccount as useEvmAccount} from "wagmi";
+import { useConfig, useAccount as useEvmAccount} from "wagmi";
 import { createPublicClient, http, formatEther } from 'viem';
 import { useDisconnect as useEvmDisconnect } from 'wagmi';
 import { useEffect } from "react";
@@ -50,8 +50,7 @@ import { useEvmCall } from "@/hooks/useEvmCall";
 import { convertSS58ToH160 } from "@/lib/utils";
 
 export function TokenBridge() {
-  const { address } = useAccount();
-  const {address: evmAddress} = useEvmAccount();
+  
   const {
     balance,
     loadingBalance,
@@ -65,9 +64,27 @@ export function TokenBridge() {
   } = usePapiClient();
   const { disconnect: disconnectEvm } = useEvmDisconnect();
   const { disconnect: disconnectSubstrate } = useDisconnect();
+  
 
-  const { chain } = useChain(); 
-  const chains = useChains(); 
+const { address } = useAccount();
+const { address: evmAddress } = useEvmAccount();
+const { chain } = useChain(); 
+const chains = useChains(); 
+
+const config = useConfig(); 
+const evmChains = config.chains; 
+const substrateChains = useChains(); 
+const currentChain = evmChains[0]; 
+
+const isEvm = !!evmAddress; 
+
+
+const activeChains = isEvm ? evmChains : substrateChains;
+const handleSelect = (network: typeof evmChains[number]) => {
+    console.log('Selected EVM network:', network);
+  };
+
+  
 
   const [fromNetwork, setFromNetwork] = useState(FROM_NETWORKS[0]);
   const [toNetwork, setToNetwork] = useState(() => {
@@ -569,6 +586,54 @@ export function TokenBridge() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
+              
+            {evmAddress ? (
+            // Card cho EVM (Metamask)
+            <Card className="p-4 bg-secondary/50 border-border/50">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                      
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium">{currentChain?.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {currentChain?.nativeCurrency?.symbol}
+                      </div>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent className="w-80">
+                  <ScrollArea className="h-64">
+                    {evmChains.map((network) => (
+                      <DropdownMenuItem
+                        key={network.id}
+                        onClick={() => handleSelect(network)}
+                        className="flex items-center gap-3 p-3 cursor-pointer"
+                      >
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                        
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium">{network.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {network.nativeCurrency?.symbol}
+                          </div>
+                        </div>
+                        {network.id === currentChain?.id && (
+                          <Check className="w-4 h-4 text-primary" />
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </ScrollArea>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </Card>
+          ) : address ? (
+            // Card cho Substrate (Polkadot)
             <Card className="p-4 bg-secondary/50 border-border/50">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -578,7 +643,7 @@ export function TokenBridge() {
                         src={chain?.chainIconUrl}
                         alt={chain?.name}
                         className="w-8 h-8 object-contain"
-                        onError={(e) => (e.currentTarget.style.display = "none")}
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
                       />
                     </div>
                     <div className="flex-1">
@@ -604,7 +669,7 @@ export function TokenBridge() {
                             src={network.chainIconUrl}
                             alt={network.name}
                             className="w-8 h-8 object-contain"
-                            onError={(e) => (e.currentTarget.style.display = "none")}
+                            onError={(e) => (e.currentTarget.style.display = 'none')}
                           />
                         </div>
                         <div className="flex-1">
@@ -622,6 +687,8 @@ export function TokenBridge() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </Card>
+          ) : null}
+
 
               <Card className="p-4 bg-secondary/50 border-border/50">
                 <div className="flex items-center gap-3 cursor-pointer">
