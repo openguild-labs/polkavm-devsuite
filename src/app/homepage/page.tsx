@@ -21,7 +21,7 @@ export default function HomePage() {
     const isConnected = polkadotAccount || evmAddress
 
     if (!isConnected) {
-      openSidebar() 
+      openSidebar("map") 
     } else {
       setOpenMapModal(true) 
     }

@@ -1,11 +1,12 @@
 import { create } from "zustand"
 
 type NetworkType = "polkadot" | "ethereum" | null
-
+type SidebarMode = "connect" | "map"
 interface WalletSidebarState {
   isOpen: boolean
   network: NetworkType
-  openSidebar: () => void
+  mode: SidebarMode
+  openSidebar: (mode?: SidebarMode) => void
   closeSidebar: () => void
   setNetwork: (network: NetworkType) => void
 }
@@ -13,7 +14,8 @@ interface WalletSidebarState {
 export const useWalletSidebar = create<WalletSidebarState>((set) => ({
   isOpen: false,
   network: null,
-  openSidebar: () => set({ isOpen: true }),
+  mode: "connect",
+  openSidebar: (mode="connect") => set({ isOpen: true, mode }),
   closeSidebar: () => set({ isOpen: false }),
   setNetwork: (network) => set({ network }),
 }))

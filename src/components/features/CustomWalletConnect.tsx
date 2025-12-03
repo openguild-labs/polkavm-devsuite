@@ -18,7 +18,7 @@ export default function CustomWalletConnect() {
   const rainbowConnectModal = useRainbowConnectModal()
   const lunoConnectModal = useLunoConnectModal()
 
-  const { isOpen, network, openSidebar, closeSidebar, setNetwork } = useWalletSidebar()
+  const { isOpen, network,mode, openSidebar, closeSidebar, setNetwork } = useWalletSidebar()
 
   const handleConnectPolkadot = () => {
     setNetwork("polkadot")
@@ -56,7 +56,7 @@ export default function CustomWalletConnect() {
           <div className="flex items-center gap-4">
             {(!polkadotAccount && !evmAddress) ? (
               <button
-                onClick={() => openSidebar()}
+                onClick={() => openSidebar("connect")}
                 className="px-4 py-2 rounded-md text-white font-medium border-2 border-white transition-all duration-300 hover:border-primary hover:shadow-[0_0_15px_var(--primary)] focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 Connect Wallet
@@ -120,19 +120,21 @@ export default function CustomWalletConnect() {
                   </div>
 
                   {/* Ethereum */}
-                  <div className="flex items-center justify-between bg-[#15171C] p-4 rounded-2xl border border-white/5 token-card-hover">
-                    <div className="flex items-center gap-3">
-                      <Image src="/wallets/ethereum.svg" alt="Ethereum" width={36} height={36} />
-                      <div>
-                        <div className="text-white font-medium">Ethereum</div>
-                        <div className="text-gray-400 text-xs">Use EVM-compatible wallets</div>
+                  {mode === "connect" && (
+                    <div className="flex items-center justify-between bg-[#15171C] p-4 rounded-2xl border border-white/5 token-card-hover">
+                      <div className="flex items-center gap-3">
+                        <Image src="/wallets/ethereum.svg" alt="Ethereum" width={36} height={36} />
+                        <div>
+                          <div className="text-white font-medium">Ethereum</div>
+                          <div className="text-gray-400 text-xs">Use EVM-compatible wallets</div>
+                        </div>
                       </div>
+                      <button
+                        onClick={handleConnectEthereum}
+                        className="px-4 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-sm"
+                      >Connect</button>
                     </div>
-                    <button
-                      onClick={handleConnectEthereum}
-                      className="px-4 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-sm"
-                    >Connect</button>
-                  </div>
+                  )}
                 </div>
               )}
 
