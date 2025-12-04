@@ -40,7 +40,7 @@ import {
 } from "@/constants";
 import { usePapiClient } from "@/hooks/usePapiClient";
 import { useAccount, useChain, useChains, useDisconnect } from "@luno-kit/react";
-import { useConfig, useAccount as useEvmAccount} from "wagmi";
+import { useChainId, useConfig, useAccount as useEvmAccount, useSwitchChain} from "wagmi";
 import { createPublicClient, http, formatEther } from 'viem';
 import { useDisconnect as useEvmDisconnect } from 'wagmi';
 import { useEffect } from "react";
@@ -65,26 +65,31 @@ export function TokenBridge() {
   const { disconnect: disconnectEvm } = useEvmDisconnect();
   const { disconnect: disconnectSubstrate } = useDisconnect();
   
+  const { address } = useAccount();
+  const { address: evmAddress } = useEvmAccount();
+  const { chain } = useChain(); 
+  const chains = useChains(); 
 
-const { address } = useAccount();
-const { address: evmAddress } = useEvmAccount();
-const { chain } = useChain(); 
-const chains = useChains(); 
+  const config = useConfig(); 
+  const evmChains = config.chains; 
 
-const config = useConfig(); 
-const evmChains = config.chains; 
-const substrateChains = useChains(); 
-const currentChain = evmChains[0]; 
+  // Chain wagmi 
+  const chainId = useChainId();           
 
-const isEvm = !!evmAddress; 
+  const { switchChain: wagmiSwitchChain } = useSwitchChain();
 
+  const isEvm = !!evmAddress;
 
-const activeChains = isEvm ? evmChains : substrateChains;
-const handleSelect = (network: typeof evmChains[number]) => {
-    console.log('Selected EVM network:', network);
+  const currentChain = isEvm
+    ? evmChains.find(c => c.id === chainId) || evmChains[0] 
+    : chain;                                               
+
+  // Click network on dropdown → chain 
+  const handleSelect = (network: (typeof evmChains)[number]) => {
+    if (isEvm) {
+      wagmiSwitchChain({ chainId: network.id });
+    }
   };
-
-  
 
   const [fromNetwork, setFromNetwork] = useState(FROM_NETWORKS[0]);
   const [toNetwork, setToNetwork] = useState(() => {
@@ -585,137 +590,160 @@ const handleSelect = (network: typeof evmChains[number]) => {
               </Badge>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              
-            {evmAddress ? (
-            // Card cho EVM (Metamask)
-            <Card className="p-4 bg-secondary/50 border-border/50">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                      
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium">{currentChain?.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {currentChain?.nativeCurrency?.symbol}
-                      </div>
-                    </div>
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                  </div>
-                </DropdownMenuTrigger>
-
-                <DropdownMenuContent className="w-80">
-                  <ScrollArea className="h-64">
-                    {evmChains.map((network) => (
-                      <DropdownMenuItem
-                        key={network.id}
-                        onClick={() => handleSelect(network)}
-                        className="flex items-center gap-3 p-3 cursor-pointer"
-                      >
+            <div className="grid grid-cols-2 gap-4">              
+            {address && (
+              <>
+                {/* SUBSTRATE CHAIN DROPDOWN CARD */}
+                <Card className="p-4 bg-secondary/50 border-border/50">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
                         <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                        
+                          <img
+                            src={chain?.chainIconUrl}
+                            alt={chain?.name}
+                            className="w-8 h-8 object-contain"
+                            onError={(e) => (e.currentTarget.style.display = "none")}
+                          />
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium">{network.name}</div>
+                          <div className="font-medium">{chain?.name}</div>
                           <div className="text-xs text-muted-foreground">
-                            {network.nativeCurrency?.symbol}
+                            {chain?.nativeCurrency.symbol}
                           </div>
                         </div>
-                        {network.id === currentChain?.id && (
-                          <Check className="w-4 h-4 text-primary" />
-                        )}
-                      </DropdownMenuItem>
-                    ))}
-                  </ScrollArea>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </Card>
-          ) : address ? (
-            // Card cho Substrate (Polkadot)
-            <Card className="p-4 bg-secondary/50 border-border/50">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                    </DropdownMenuTrigger>
+
+                    <DropdownMenuContent className="w-80">
+                      <ScrollArea className="h-64">
+                        {chains.map((network) => (
+                          <DropdownMenuItem
+                            key={network.genesisHash}
+                            onClick={() => handleFromNetworkSelect(network)}
+                            className="flex items-center gap-3 p-3 cursor-pointer"
+                          >
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                              <img
+                                src={network.chainIconUrl}
+                                alt={network.name}
+                                className="w-8 h-8 object-contain"
+                                onError={(e) => (e.currentTarget.style.display = "none")}
+                              />
+                            </div>
+
+                            <div className="flex-1">
+                              <div className="font-medium">{network.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {network.nativeCurrency.symbol}
+                              </div>
+                            </div>
+
+                            {network.genesisHash === chain?.genesisHash && (
+                              <Check className="w-4 h-4 text-primary" />
+                            )}
+                          </DropdownMenuItem>
+                        ))}
+                      </ScrollArea>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </Card>
+                {/* SUBSTRATE SMALL CARD */}
+                <Card className="p-4 bg-secondary/50 border-border/50">
+                  <div className="flex items-center gap-3 cursor-pointer">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
                       <img
                         src={chain?.chainIconUrl}
                         alt={chain?.name}
                         className="w-8 h-8 object-contain"
-                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                        onError={(e) => {
+                          const target = e.currentTarget as HTMLImageElement;
+                          target.style.display = "none";
+                          const nextElement = target.nextElementSibling as HTMLElement;
+                          if (nextElement) nextElement.style.display = "flex";
+                        }}
                       />
                     </div>
+
                     <div className="flex-1">
-                      <div className="font-medium">{chain?.name}</div>
+                      <div className="font-medium">{chain?.nativeCurrency.symbol}</div>
                       <div className="text-xs text-muted-foreground">
-                        {chain?.nativeCurrency.symbol}
+                        {chain?.nativeCurrency.name}
                       </div>
                     </div>
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
                   </div>
-                </DropdownMenuTrigger>
+                </Card>                
+              </>
+            )}
 
-                <DropdownMenuContent className="w-80">
-                  <ScrollArea className="h-64">
-                    {chains.map((network) => (
-                      <DropdownMenuItem
-                        key={network.genesisHash}
-                        onClick={() => handleFromNetworkSelect(network)}
-                        className="flex items-center gap-3 p-3 cursor-pointer"
-                      >
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                          <img
-                            src={network.chainIconUrl}
-                            alt={network.name}
-                            className="w-8 h-8 object-contain"
-                            onError={(e) => (e.currentTarget.style.display = 'none')}
-                          />
+            {evmAddress && (
+              <>
+                {/* EVM CHAIN DROPDOWN CARD */}
+                <Card className="p-4 bg-secondary/50 border-border/50">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">             
                         </div>
+
                         <div className="flex-1">
-                          <div className="font-medium">{network.name}</div>
+                          <div className="font-medium">{currentChain?.name}</div>
                           <div className="text-xs text-muted-foreground">
-                            {network.nativeCurrency.symbol}
+                            {currentChain?.nativeCurrency?.symbol}
                           </div>
                         </div>
-                        {network.genesisHash === chain?.genesisHash && (
-                          <Check className="w-4 h-4 text-primary" />
-                        )}
-                      </DropdownMenuItem>
-                    ))}
-                  </ScrollArea>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </Card>
-          ) : null}
 
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                    </DropdownMenuTrigger>
 
-              <Card className="p-4 bg-secondary/50 border-border/50">
-                <div className="flex items-center gap-3 cursor-pointer">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                    <img
-                      src={chain?.chainIconUrl}
-                      alt={chain?.name}
-                      className="w-8 h-8 object-contain"
-                      onError={(e) => {
-                        const target = e.currentTarget as HTMLImageElement;
-                        target.style.display = "none";
-                        const nextElement =
-                          target.nextElementSibling as HTMLElement;
-                        if (nextElement) nextElement.style.display = "flex";
-                      }}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium">{chain?.nativeCurrency.symbol}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {chain?.nativeCurrency.name}
+                    <DropdownMenuContent className="w-80">
+                      <ScrollArea className="h-64">
+                        {evmChains.map((network) => (
+                          <DropdownMenuItem
+                            key={network.id}
+                            onClick={() => handleSelect(network)}
+                            className="flex items-center gap-3 p-3 cursor-pointer"
+                          >
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                              
+                            </div>
+
+                            <div className="flex-1">
+                              <div className="font-medium">{network.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {network.nativeCurrency?.symbol}
+                              </div>
+                            </div>
+
+                            {isEvm && currentChain && (currentChain as any).id === (network as any).id && (
+                              <Check className="w-4 h-4 text-primary" />
+                            )}
+                          </DropdownMenuItem>
+                        ))}
+                      </ScrollArea>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </Card>
+                {/* EVM SMALL CARD */}
+                <Card className="p-4 bg-secondary/50 border-border/50">
+                  <div className="flex items-center gap-3 cursor-pointer">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                        {/*images */}
+                    </div>
+
+                    <div className="flex-1">
+                      <div className="font-medium">{currentChain?.nativeCurrency?.symbol}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {currentChain?.nativeCurrency?.name}
+                      </div>
                     </div>
                   </div>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                </div>
-              </Card>
-            </div>
+                </Card>                
+              </>
+            )}              
+          </div>
 
             <div className="relative">
               <Input
