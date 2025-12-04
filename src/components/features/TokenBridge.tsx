@@ -39,7 +39,7 @@ import {
   type SupportedPolkaVMChain,
 } from "@/constants";
 import { usePapiClient } from "@/hooks/usePapiClient";
-import { useAccount, useDisconnect } from "@luno-kit/react";
+import { useAccount, useChain, useChains, useDisconnect } from "@luno-kit/react";
 import { useAccount as useEvmAccount} from "wagmi";
 import { createPublicClient, http, formatEther } from 'viem';
 import { useDisconnect as useEvmDisconnect } from 'wagmi';
@@ -65,6 +65,9 @@ export function TokenBridge() {
   } = usePapiClient();
   const { disconnect: disconnectEvm } = useEvmDisconnect();
   const { disconnect: disconnectSubstrate } = useDisconnect();
+
+  const { chain } = useChain(); 
+  const chains = useChains(); 
 
   const [fromNetwork, setFromNetwork] = useState(FROM_NETWORKS[0]);
   const [toNetwork, setToNetwork] = useState(() => {
@@ -391,10 +394,6 @@ export function TokenBridge() {
     setCurrentTxHash(null);
 
     try {
-
-
-
-
       console.log("🔍 Bridge direction check:");
       console.log("- isFromPolkaVM:", isFromPolkaVM);
       console.log("- isToSubstrate:", isToSubstrate);
@@ -523,6 +522,8 @@ export function TokenBridge() {
     }
   };
 
+
+
   return (
     <div className="min-h-screen network-grid">
       {/* Main Content */}
@@ -568,78 +569,66 @@ export function TokenBridge() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Card className="p-4 bg-secondary/50 border-border/50">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                        <img
-                          src={fromNetwork.chainIconUrl}
-                          alt={fromNetwork.name}
-                          className="w-8 h-8 object-contain"
-                          onError={(e) => {
-                            const target = e.currentTarget as HTMLImageElement;
-                            target.style.display = "none";
-                            const nextElement =
-                              target.nextElementSibling as HTMLElement;
-                            if (nextElement) nextElement.style.display = "flex";
-                          }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium">{fromNetwork.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {fromNetwork.symbol}
-                        </div>
-                      </div>
-                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            <Card className="p-4 bg-secondary/50 border-border/50">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                      <img
+                        src={chain?.chainIconUrl}
+                        alt={chain?.name}
+                        className="w-8 h-8 object-contain"
+                        onError={(e) => (e.currentTarget.style.display = "none")}
+                      />
                     </div>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-80">
-                    <ScrollArea className="h-64">
-                      {(isReversed ? TO_NETWORKS : FROM_NETWORKS).map((network) => (
-                        <DropdownMenuItem
-                          key={network.id}
-                          onClick={() => handleFromNetworkSelect(network)}
-                          className="flex items-center gap-3 p-3 cursor-pointer">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                            <img
-                              src={network.chainIconUrl}
-                              alt={network.name}
-                              className="w-8 h-8 object-contain"
-                              onError={(e) => {
-                                const target =
-                                  e.currentTarget as HTMLImageElement;
-                                target.style.display = "none";
-                                const nextElement =
-                                  target.nextElementSibling as HTMLElement;
-                                if (nextElement)
-                                  nextElement.style.display = "flex";
-                              }}
-                            />
+                    <div className="flex-1">
+                      <div className="font-medium">{chain?.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {chain?.nativeCurrency.symbol}
+                      </div>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent className="w-80">
+                  <ScrollArea className="h-64">
+                    {chains.map((network) => (
+                      <DropdownMenuItem
+                        key={network.genesisHash}
+                        onClick={() => handleFromNetworkSelect(network)}
+                        className="flex items-center gap-3 p-3 cursor-pointer"
+                      >
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                          <img
+                            src={network.chainIconUrl}
+                            alt={network.name}
+                            className="w-8 h-8 object-contain"
+                            onError={(e) => (e.currentTarget.style.display = "none")}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium">{network.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {network.nativeCurrency.symbol}
                           </div>
-                          <div className="flex-1">
-                            <div className="font-medium">{network.name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {network.symbol}
-                            </div>
-                          </div>
-                          {network.id === fromNetwork.id && (
-                            <Check className="w-4 h-4 text-primary" />
-                          )}
-                        </DropdownMenuItem>
-                      ))}
-                    </ScrollArea>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </Card>
+                        </div>
+                        {network.genesisHash === chain?.genesisHash && (
+                          <Check className="w-4 h-4 text-primary" />
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </ScrollArea>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </Card>
 
               <Card className="p-4 bg-secondary/50 border-border/50">
                 <div className="flex items-center gap-3 cursor-pointer">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
                     <img
-                      src={selectedToken.chainIconUrl}
-                      alt={selectedToken.name}
+                      src={chain?.chainIconUrl}
+                      alt={chain?.name}
                       className="w-8 h-8 object-contain"
                       onError={(e) => {
                         const target = e.currentTarget as HTMLImageElement;
@@ -651,9 +640,9 @@ export function TokenBridge() {
                     />
                   </div>
                   <div className="flex-1">
-                    <div className="font-medium">{selectedToken.symbol}</div>
+                    <div className="font-medium">{chain?.nativeCurrency.symbol}</div>
                     <div className="text-xs text-muted-foreground">
-                      {selectedToken.name}
+                      {chain?.nativeCurrency.name}
                     </div>
                   </div>
                   <ChevronDown className="w-4 h-4 text-muted-foreground" />

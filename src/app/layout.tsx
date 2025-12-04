@@ -9,6 +9,7 @@ import '@rainbow-me/rainbowkit/styles.css';
 
 import './globals.css'
 import { ToastProvider } from '@/providers/ToastProviders'
+import CustomWalletConnect from '@/components/features/CustomWalletConnect'
 
 export const metadata: Metadata = {
   title: 'PolkaVM DevTool',
@@ -27,6 +28,7 @@ export default function RootLayout({
         <ToastProvider>
           <SubstrateKitProviders>
             <WagmiProvider>
+              <CustomWalletConnect />
               {children}
               <Toaster />
             </WagmiProvider>
