@@ -48,6 +48,7 @@ import { createClient as createSubstrateClient } from "polkadot-api";
 import { getWsProvider } from "polkadot-api/ws-provider/web";
 import { useEvmCall } from "@/hooks/useEvmCall";
 import { convertSS58ToH160 } from "@/lib/utils";
+import { EVM_TO_SUBSTRATE, SUBSTRATE_TO_EVM } from "@/config/chainMapping";
 
 export function TokenBridge() {
   
@@ -73,22 +74,41 @@ export function TokenBridge() {
   const config = useConfig(); 
   const evmChains = config.chains; 
 
+  const isSubstrateConnected = !!address;
+  const isEvmConnected = !!evmAddress;
+  const isConnected = isSubstrateConnected || isEvmConnected;
+  
   // Chain wagmi 
-  const chainId = useChainId();           
-
+  const chainId = useChainId();
   const { switchChain: wagmiSwitchChain } = useSwitchChain();
-
   const isEvm = !!evmAddress;
-
-  const currentChain = isEvm
-    ? evmChains.find(c => c.id === chainId) || evmChains[0] 
-    : chain;  
-
+  // if EVM → chain with id
+  const evmChain = isEvm
+    ? evmChains.find(c => c.id === chainId) || null
+    : null;
+  // if Substrate →  chain with luno-kit (chain object)
+  const substrateChain = !isEvm ? chain : null;
+  const currentChain = isEvm ? evmChain : substrateChain;
   const fromType = isEvm ? "EVM" : "SUBSTRATE";
-  // FIXED: toChain logic
-  const toChain = fromType === "SUBSTRATE"
-    ? evmChains.find(c => c.id === chainId) || evmChains[0]  
-    : chain;  
+  // Nếu không có currentChain thì return null
+  let toChain: any = null;
+  // CASE 1: FROM SUBSTRATE → TO EVM
+  if (!isEvm && substrateChain) {
+    const evmTargetId = SUBSTRATE_TO_EVM[substrateChain.name]; 
+    toChain = evmChains.find(c => c.id === evmTargetId) || null;
+  }
+  // CASE 2: FROM EVM → TO SUBSTRATE
+  if (isEvm && evmChain) {
+    // Convert chainId number
+    const evmId = Number(evmChain.id);
+    // chain Substrate with map
+    const substrateTargetName = EVM_TO_SUBSTRATE[evmId];
+    toChain = chains.find(c => c.name === substrateTargetName) || null;
+  }
+  if (!isConnected) {
+    toChain = null;
+  }
+
   // Click network on dropdown → chain 
   const handleSelect = (network: (typeof evmChains)[number]) => {
     if (isEvm) {
@@ -819,13 +839,13 @@ export function TokenBridge() {
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">To</label>
               <Badge variant="outline" className="text-xs">
-                {toNetwork.name}
+                {toChain ? toChain.name : "—"}
               </Badge>
             </div>
 
             {/* ====================  TO SECTION  ===================== */}
             <div className="grid grid-cols-2 gap-4 mt-6">
-              {fromType === "SUBSTRATE" && (
+              {isSubstrateConnected && fromType === "SUBSTRATE" && (
                 <>
                   {/* EVM CHAIN DROPDOWN CARD */}
                   <Card className="p-4 bg-secondary/50 border-border/50">
@@ -888,7 +908,7 @@ export function TokenBridge() {
                 </>
               )}
 
-              {fromType === "EVM" && (
+             {isEvmConnected && fromType === "EVM" &&( 
                 <>
                   {/* SUBSTRATE CHAIN DROPDOWN CARD */}
                   <Card className="p-4 bg-secondary/50 border-border/50">
@@ -897,16 +917,16 @@ export function TokenBridge() {
                         <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
                           <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
                             <img
-                              src={chain?.chainIconUrl}
-                              alt={chain?.name}
+                              src={toChain?.chainIconUrl}
+                              alt={toChain?.name}
                               className="w-8 h-8 object-contain"
                             />
                           </div>
 
                           <div className="flex-1">
-                            <div className="font-medium">{chain?.name}</div>
+                            <div className="font-medium">{toChain?.name}</div>
                             <div className="text-xs text-muted-foreground">
-                              {chain?.nativeCurrency.symbol}
+                              {toChain?.nativeCurrency.symbol}
                             </div>
                           </div>
 
@@ -933,7 +953,7 @@ export function TokenBridge() {
                                 </div>
                               </div>
 
-                              {chain?.genesisHash === network.genesisHash && (
+                              {toChain?.genesisHash === network.genesisHash && (
                                 <Check className="w-4 h-4 text-primary" />
                               )}
                             </DropdownMenuItem>
@@ -947,13 +967,13 @@ export function TokenBridge() {
                   <Card className="p-4 bg-secondary/50 border-border/50">
                     <div className="flex items-center gap-3 cursor-pointer">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                        <img src={chain?.chainIconUrl} className="w-8 h-8" />
+                        <img src={toChain?.chainIconUrl} className="w-8 h-8" />
                       </div>
 
                       <div className="flex-1">
-                        <div className="font-medium">{chain?.nativeCurrency.symbol}</div>
+                        <div className="font-medium">{toChain?.nativeCurrency.symbol}</div>
                         <div className="text-xs text-muted-foreground">
-                          {chain?.nativeCurrency.name}
+                          {toChain?.nativeCurrency.name}
                         </div>
                       </div>
                     </div>
