@@ -48,7 +48,7 @@ import { createClient as createSubstrateClient } from "polkadot-api";
 import { getWsProvider } from "polkadot-api/ws-provider/web";
 import { useEvmCall } from "@/hooks/useEvmCall";
 import { convertSS58ToH160 } from "@/lib/utils";
-import { EVM_TO_SUBSTRATE, SUBSTRATE_TO_EVM } from "@/config/chainMapping";
+import { EVM_CHAIN_ICONS, EVM_TO_SUBSTRATE, SUBSTRATE_TO_EVM } from "@/config/chainMapping";
 
 export function TokenBridge() {
   
@@ -114,6 +114,14 @@ export function TokenBridge() {
     if (isEvm) {
       wagmiSwitchChain({ chainId: network.id });
     }
+  };
+
+  const getChainIcon = (chain: any) => {
+    if (chain?.chainIconUrl) return chain.chainIconUrl;
+    if (chain?.id && EVM_CHAIN_ICONS[chain.id]) {
+      return EVM_CHAIN_ICONS[chain.id];
+    }
+    return "/icons/default-chain.svg";
   };
 
   const [fromNetwork, setFromNetwork] = useState(FROM_NETWORKS[0]);
@@ -707,7 +715,12 @@ export function TokenBridge() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">             
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">   
+                            <img
+                              src={getChainIcon(currentChain)}
+                              className="w-8 h-8 object-contain"
+                              alt={currentChain?.name}
+                            />          
                           </div>
 
                           <div className="flex-1">
@@ -730,7 +743,11 @@ export function TokenBridge() {
                               className="flex items-center gap-3 p-3 cursor-pointer"
                             >
                               <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                                
+                                <img
+                                  src={getChainIcon(network)}
+                                  className="w-8 h-8 object-contain"
+                                  alt={network.name}
+                                />
                               </div>
 
                               <div className="flex-1">
@@ -753,7 +770,11 @@ export function TokenBridge() {
                   <Card className="p-4 bg-secondary/50 border-border/50">
                     <div className="flex items-center gap-3 cursor-pointer">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                          {/*images */}
+                          <img
+                            src={getChainIcon(currentChain)}
+                            className="w-8 h-8 object-contain"
+                            alt={currentChain?.name}
+                          />
                       </div>
 
                       <div className="flex-1">
@@ -853,6 +874,11 @@ export function TokenBridge() {
                       <DropdownMenuTrigger asChild>
                         <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
                           <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden"></div>
+                            <img
+                              src={getChainIcon(toChain)}
+                              className="w-8 h-8 object-contain"
+                              alt={toChain?.name}
+                            />
 
                           <div className="flex-1">
                             <div className="font-medium">{toChain?.name}</div>
@@ -873,7 +899,13 @@ export function TokenBridge() {
                               onClick={() => handleSelect(network)}
                               className="flex items-center gap-3 p-3 cursor-pointer"
                             >
-                              <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden"></div>
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                                <img
+                                  src={getChainIcon(network)}
+                                  className="w-8 h-8 object-contain"
+                                  alt={network.name}
+                                />
+                              </div>
 
                               <div className="flex-1">
                                 <div className="font-medium">{network.name}</div>
@@ -895,7 +927,13 @@ export function TokenBridge() {
                   {/* SMALL CARD */}
                   <Card className="p-4 bg-secondary/50 border-border/50">
                     <div className="flex items-center gap-3 cursor-pointer">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden"></div>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                        <img
+                          src={getChainIcon(toChain)}
+                          className="w-8 h-8 object-contain"
+                          alt={toChain?.name}
+                        />
+                      </div>
 
                       <div className="flex-1">
                         <div className="font-medium">{toChain?.nativeCurrency?.symbol}</div>
