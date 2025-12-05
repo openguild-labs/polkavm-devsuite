@@ -820,28 +820,6 @@ export function TokenBridge() {
                 MAX
               </Button>
             </div>
-
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <span>
-                  Balance:{" "}
-                  {loadingBalance
-                    ? "Loading..."
-                    : address
-                      ? `${balance.formattedTotal} ${fromNetwork.symbol}`
-                      : "Connect wallet"}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={refreshBalance}
-                  disabled={loadingBalance || !address}
-                  className="h-6 px-2 text-xs">
-                  🔄
-                </Button>
-              </div>
-              <span>{selectedToken.price}</span>
-            </div>
           </div>
 
           {/* Swap Button */}
@@ -865,7 +843,7 @@ export function TokenBridge() {
             </div>
 
             {/* ====================  TO SECTION  ===================== */}
-            <div className="grid grid-cols-2 gap-4 mt-6">
+            <div className="grid grid-cols-2 gap-4">
               {isSubstrateConnected && fromType === "SUBSTRATE" && (
                 <>
                   {/* EVM CHAIN DROPDOWN CARD */}
@@ -873,13 +851,13 @@ export function TokenBridge() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <div className="flex items-center gap-3 cursor-pointer hover:bg-secondary/70 transition-colors rounded-md p-2 -m-2">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden"></div>
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
                             <img
                               src={getChainIcon(toChain)}
                               className="w-8 h-8 object-contain"
                               alt={toChain?.name}
                             />
-
+                          </div>
                           <div className="flex-1">
                             <div className="font-medium">{toChain?.name}</div>
                             <div className="text-xs text-muted-foreground">
