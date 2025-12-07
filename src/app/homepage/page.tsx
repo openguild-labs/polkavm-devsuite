@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -12,20 +12,32 @@ import MapAccountModal from "@/components/features/MapAccountModal"
 export default function HomePage() {
   const { account: polkadotAccount } = usePolkadotAccount()
   const { address: evmAddress } = useEvmAccount()
-  const { openSidebar } = useWalletSidebar()
+  const { openSidebar, closeSidebar } = useWalletSidebar()
 
   const [openMapModal, setOpenMapModal] = useState(false)
+  const [pendingMapAction, setPendingMapAction] = useState(false)
 
   const handleMapAccountClick = (e: React.MouseEvent) => {
     e.preventDefault() 
     const isConnected = polkadotAccount || evmAddress
 
     if (!isConnected) {
+      setPendingMapAction(true)
       openSidebar("map") 
     } else {
       setOpenMapModal(true) 
     }
   }
+
+  useEffect(()=>{
+    const isConnected = polkadotAccount || evmAddress
+
+    if(pendingMapAction && isConnected){
+      setOpenMapModal(true)
+      setPendingMapAction(false)
+      closeSidebar?.()
+    }
+  },[polkadotAccount, evmAddress, pendingMapAction, closeSidebar])
 
   return (
     <div className="min-h-screen network-grid">
