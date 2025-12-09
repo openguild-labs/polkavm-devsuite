@@ -48,7 +48,7 @@ import { createClient as createSubstrateClient } from "polkadot-api";
 import { getWsProvider } from "polkadot-api/ws-provider/web";
 import { useEvmCall } from "@/hooks/useEvmCall";
 import { convertSS58ToH160 } from "@/lib/utils";
-import { EVM_TO_SUBSTRATE, SUBSTRATE_TO_EVM, useEvmChainIcons } from "@/config/chainMapping";
+import { EVM_TO_SUBSTRATE, POLKAVM_TO_POLKADOT, SUBSTRATE_TO_EVM, useEvmChainIcons } from "@/config/chainMapping";
 
 export function TokenBridge() {
   
@@ -201,6 +201,49 @@ const evmIcons = useEvmChainIcons();
     error: evmCall.error
   });
 
+    //helper 
+  const isPolkaVMNetwork = (network: any) => {
+    // EVM/PolkaVM chains in your app usually expose numeric chain id
+    if (!network) return false;
+    if (typeof network.id === "number") return true;
+    if (network.id && typeof network.id === "string" && POLKAVM_CHAINS[network.id as keyof typeof POLKAVM_CHAINS]) {
+      return true;
+    }
+    if (network.displayName && /PolkaVM/i.test(network.displayName)) return true;
+    return false;
+  };
+
+  const isSubstrateNetwork = (network: any) => {
+    if (!network) return false;
+    // Substrate chains from luno-kit have genesisHash property (or no numeric id)
+    if (network.genesisHash) return true;
+    // fallback: if not numeric id and not in POLKAVM_CHAINS
+    if (typeof network.id === "string" && !POLKAVM_CHAINS[network.id as keyof typeof POLKAVM_CHAINS]) return true;
+    return false;
+  };
+
+  // resolve mapping helpers (pure lookup + defensive)
+  const evmIdForSubstrate = (substrateNetwork: any) => {
+    if (!substrateNetwork) return null;
+    // try by exact name (your EVM map uses substrate.name)
+    return SUBSTRATE_TO_EVM[substrateNetwork.name] ?? null;
+  };
+
+  const substrateGenesisForEvmId = (evmId: number) => {
+    if (!evmId) return null;
+    return POLKAVM_TO_POLKADOT[evmId] ?? null; // returns genesisHash string
+  };
+
+  // find substrate chain object (from useChains() list) by genesisHash or name
+  const findSubstrateChainObject = (chainsList: any[], genesisOrName: string) => {
+    if (!chainsList || !genesisOrName) return null;
+    // first match genesisHash
+    const byGenesis = chainsList.find(c => c.genesisHash === genesisOrName);
+    if (byGenesis) return byGenesis;
+    // then match name
+    return chainsList.find(c => c.name === genesisOrName) || null;
+  };
+
   const getTokenName = (network: any) => {
     if (network.displayName) {
       const baseName = network.displayName.replace(/PolkaVM\s+/i, '').replace(/\s+Asset Hub/i, '');
@@ -316,17 +359,28 @@ const evmIcons = useEvmChainIcons();
   };
 
   const getAddressValidation = () => {
-    const isToPolkaVM = TO_NETWORKS.some(network => network.id === toNetwork.id);
+    // from is PolkaVM → recipient must be Substrate
+    if (isPolkaVMNetwork(fromNetwork) && isSubstrateNetwork(toNetwork)) {
+      return isValidSubstrateAddress;
+    }
 
-    console.log("isToPolkaVM", isToPolkaVM);
-    console.log("isValidEvmAddress", isValidEvmAddress);
-    console.log("isValidSubstrateAddress", isValidSubstrateAddress);
-    return isToPolkaVM ? isValidEvmAddress : isValidSubstrateAddress;
+    // from is Substrate → recipient must be EVM
+    if (isSubstrateNetwork(fromNetwork) && isPolkaVMNetwork(toNetwork)) {
+      return isValidEvmAddress;
+    }
+
+    return () => false;
   };
 
+
   const getAddressPlaceholder = () => {
-    const isToPolkaVM = TO_NETWORKS.some(network => network.id === toNetwork.id);
-    return isToPolkaVM ? "Your EVM address here" : "Your Substrate address here";
+    if (isPolkaVMNetwork(fromNetwork) && isSubstrateNetwork(toNetwork))
+      return "Enter Substrate SS58 address";
+
+    if (isSubstrateNetwork(fromNetwork) && isPolkaVMNetwork(toNetwork))
+      return "Enter EVM 0x address";
+
+    return "Enter address";
   };
 
   const getAddressLabel = () => {
@@ -396,192 +450,141 @@ const evmIcons = useEvmChainIcons();
 
   useEffect(() => {
     const validateAddress = getAddressValidation();
-    if (recipientAddress && validateAddress(recipientAddress)) {
-      const isToPolkaVM = TO_NETWORKS.some(network => network.id === toNetwork.id);
-      if (isToPolkaVM) {
-        // TO network is PolkaVM, fetch EVM balance
-        fetchEvmBalance(recipientAddress, toNetwork.id);
+    if (!recipientAddress || !validateAddress(recipientAddress)) {
+      setEvmBalance(null);
+      setSubstrateBalance(null);
+      return;
+    }
+
+    const toIsPolkaVM = isPolkaVMNetwork(toNetwork); 
+    console.log("DEBUG balance check -> recipient:", recipientAddress, "toIsPolkaVM:", toIsPolkaVM, "toNetwork:", toNetwork);
+
+    if (toIsPolkaVM) {
+      // TO is PolkaVM/EVM -> fetch EVM balance (we need an evm chain id to call)
+      // Resolve polkavm chain id (if toNetwork already is EVM, it may have numeric id)
+      const evmId = typeof toNetwork.id === "number"
+        ? toNetwork.id
+        : (POLKAVM_CHAINS[toNetwork.id as keyof typeof POLKAVM_CHAINS]?.chainId ?? null);
+
+      if (evmId) {
+        // use your existing fetchEvmBalance expecting polkavm chain key / id
+        fetchEvmBalance(recipientAddress, evmId.toString());
         setSubstrateBalance(null);
       } else {
-        // TO network is Substrate, fetch Substrate balance
-        fetchSubstrateBalance(recipientAddress, toNetwork.id);
+        console.warn("No EVM chain id resolved for toNetwork:", toNetwork);
         setEvmBalance(null);
       }
     } else {
+      // TO is Substrate
+      // For substrate fetch we resolve the substrate chain id/key — you may store toNetwork.id as genesisHash or an alias
+      const substrateGenesis = (toNetwork as any)?.genesisHash;
+      const substrateId = substrateGenesis ?? toNetwork.id ?? toNetwork.name;
+      fetchSubstrateBalance(recipientAddress, substrateId);
       setEvmBalance(null);
-      setSubstrateBalance(null);
     }
-  }, [recipientAddress, toNetwork.id, fromNetwork.id]);
+  }, [recipientAddress, toNetwork, fromNetwork]);
+
 
   const bridgeTokens = async () => {
     const validateAddress = getAddressValidation();
     console.log("Validate Address:", validateAddress(recipientAddress));
     console.log("Recipient Address:", recipientAddress);
     console.log("Amount:", amount);
-    console.log("Address:", address);
-    // Determine bridge direction
-    const isFromPolkaVM = TO_NETWORKS.some(network => network.id === fromNetwork.id);
-    const isToSubstrate = FROM_NETWORKS.some(network => network.id === toNetwork.id);
+    console.log("Substrate address (address):", address, "EVM address (evmAddress):", evmAddress);
+    // Determine bridge direction using helpers
+    const fromIsPolkaVM = isPolkaVMNetwork(fromNetwork);
+    const toIsSubstrate = isSubstrateNetwork(toNetwork);
 
-    if (isFromPolkaVM && isToSubstrate) {
+    console.log("Direction detect -> fromIsPolkaVM:", fromIsPolkaVM, "toIsSubstrate:", toIsSubstrate, "fromNetwork:", fromNetwork, "toNetwork:", toNetwork);
+
+    // Wallet availability checks
+    if (fromIsPolkaVM && toIsSubstrate) {
+      // need EVM wallet to send tx (PolkaVM -> Substrate uses evmCall)
       if (!evmAddress) {
-        console.log("❌ No EVM address available for PolkaVM to Substrate bridge");
         setBridgeError("Please connect your EVM wallet to bridge from PolkaVM to Substrate");
         return;
       }
-    }
-    else {
-      if(!address) {
-        console.log("❌ No Substrate address available for Substrate to PolkaVM bridge");
+    } else {
+      // Substrate -> PolkaVM requires Substrate address connected
+      if (!address) {
         setBridgeError("Please connect your Substrate wallet to bridge from Substrate to PolkaVM");
         return;
       }
     }
 
-    
-    if (
-      !recipientAddress ||
-      !amount ||
-      !validateAddress(recipientAddress)
-    ) {
+    if (!recipientAddress || !amount || !validateAddress(recipientAddress)) {
       setBridgeError("Please fill in all required fields with valid values");
       return;
     }
 
-    console.log("🚀 Starting bridge process...");
     setIsBridging(true);
     setBridgeError(null);
     setShowTransactionDialog(true);
     setCurrentTxHash(null);
 
     try {
-      console.log("🔍 Bridge direction check:");
-      console.log("- isFromPolkaVM:", isFromPolkaVM);
-      console.log("- isToSubstrate:", isToSubstrate);
-      console.log("- fromNetwork.id:", fromNetwork.id);
-      console.log("- toNetwork.id:", toNetwork.id);
-
-      if (isFromPolkaVM && isToSubstrate) {
-        console.log("🌉 PolkaVM to Substrate bridge detected");
-        // PolkaVM to Substrate bridge using EVM call - single step only
+      if (fromIsPolkaVM && toIsSubstrate) {
+        // PolkaVM -> Substrate (EVM call)
         setIsPolkaVMToSubstrate(true);
         setTransactionSteps({
           mapAccount: { status: "completed", txHash: null },
           call: { status: "active", txHash: null },
         });
 
-        console.log("📞 Executing EVM call...");
-        console.log("- evmCall state before execution:", {
-          to: evmCall.to,
-          value: evmCall.value,
-          isReady: evmCall.isReady,
-          isLoading: evmCall.isLoading,
-          error: evmCall.error
-        });
-
+        console.log("Executing EVM call (PolkaVM -> Substrate) evmCall:", evmCall);
         const txHash = await evmCall.execute();
-        console.log("✅ EVM call executed, transaction hash received:", txHash);
-
+        console.log("EVM txHash:", txHash);
         setCurrentTxHash(txHash || null);
-        console.log("📝 Setting current transaction hash:", txHash);
 
-        // Wait for transaction receipt to confirm success
-        console.log("⏳ Waiting for transaction receipt...");
         const receipt = await evmCall.waitForReceipt();
-
-        console.log("✅ Transaction receipt received:", receipt);
-        console.log("- Status:", receipt.status);
+        console.log("EVM receipt:", receipt);
 
         setTransactionSteps((prev) => ({
           ...prev,
-          call: {
-            status: "completed",
-            txHash: txHash || null,
-          },
+          call: { status: "completed", txHash: txHash || null },
         }));
-        console.log("✅ Transaction steps updated to completed");
       } else {
-        // Substrate to PolkaVM bridge (existing logic)
+        // Substrate -> PolkaVM
         setIsPolkaVMToSubstrate(false);
-        const isAlreadyMapped = await isMappedAccount();
-
-        if (isAlreadyMapped) {
+        const mapped = await isMappedAccount();
+        if (mapped) {
           setTransactionSteps({
             mapAccount: { status: "completed", txHash: null },
             call: { status: "pending", txHash: null },
           });
-
-          setTransactionSteps((prev) => ({
-            ...prev,
-            call: { status: "active", txHash: null },
-          }));
-
+          setTransactionSteps((prev) => ({ ...prev, call: { status: "active", txHash: null } }));
           const depositResult = await depositAccount(recipientAddress, amount);
-
-          setTransactionSteps((prev) => ({
-            ...prev,
-            call: {
-              status: "completed",
-              txHash: depositResult.transactionHash,
-            },
-          }));
+          setTransactionSteps((prev) => ({ ...prev, call: { status: "completed", txHash: depositResult.transactionHash } }));
           setCurrentTxHash(depositResult.transactionHash);
         } else {
-          setTransactionSteps({
-            mapAccount: { status: "pending", txHash: null },
-            call: { status: "pending", txHash: null },
-          });
-
-          setTransactionSteps((prev) => ({
-            ...prev,
-            mapAccount: { status: "active", txHash: null },
-          }));
-
+          setTransactionSteps({ mapAccount: { status: "pending", txHash: null }, call: { status: "pending", txHash: null } });
+          setTransactionSteps((prev) => ({ ...prev, mapAccount: { status: "active", txHash: null } }));
           const mapResult = await mapAccount();
-
-          setTransactionSteps((prev) => ({
-            ...prev,
-            mapAccount: {
-              status: "completed",
-              txHash: mapResult.transactionHash,
-            },
-          }));
+          setTransactionSteps((prev) => ({ ...prev, mapAccount: { status: "completed", txHash: mapResult.transactionHash } }));
           setCurrentTxHash(mapResult.transactionHash);
 
-          setTransactionSteps((prev) => ({
-            ...prev,
-            call: { status: "active", txHash: null },
-          }));
-
+          setTransactionSteps((prev) => ({ ...prev, call: { status: "active", txHash: null } }));
           const depositResult = await depositAccount(recipientAddress, amount);
-
-          setTransactionSteps((prev) => ({
-            ...prev,
-            call: {
-              status: "completed",
-              txHash: depositResult.transactionHash,
-            },
-          }));
+          setTransactionSteps((prev) => ({ ...prev, call: { status: "completed", txHash: depositResult.transactionHash } }));
           setCurrentTxHash(depositResult.transactionHash);
         }
       }
 
-      console.log("🎉 Bridge process completed successfully!");
+      // success flow
+      console.log("Bridge completed");
       setTimeout(() => {
-        console.log("🔄 Closing transaction dialog and resetting state...");
         setShowTransactionDialog(false);
         setIsBridging(false);
         refreshBalance();
         setAmount("");
       }, 2000);
-    } catch (error) {
-      console.error("Bridge transaction failed:", error);
-      setBridgeError(
-        error instanceof Error ? error.message : "Transaction failed"
-      );
+    } catch (err) {
+      console.error("Bridge transaction failed:", err);
+      setBridgeError(err instanceof Error ? err.message : "Transaction failed");
       setIsBridging(false);
     }
   };
+
 
   return (
     <div className="min-h-screen network-grid">
