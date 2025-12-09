@@ -9,6 +9,7 @@ import { ConnectButton as RainbowKitConnectButton, useConnectModal as useRainbow
 import { ConnectButton as LunoConnectButton, useConnectModal as useLunoConnectModal } from "@luno-kit/ui"
 import Link from "next/link"
 import { useWalletSidebar } from "@/stores/useWalletSidebar"
+import { useEffect } from "react"
 
 export default function CustomWalletConnect() {
   const { account: polkadotAccount } = usePolkadotAccount()
@@ -20,6 +21,13 @@ export default function CustomWalletConnect() {
   const lunoConnectModal = useLunoConnectModal()
 
   const { isOpen, network,mode, openSidebar, closeSidebar, setNetwork } = useWalletSidebar()
+
+  useEffect(() => {
+    if (!network) {
+      if (polkadotAccount) setNetwork("polkadot");
+      else if (evmAddress) setNetwork("ethereum");
+    }
+  }, [polkadotAccount, evmAddress, network, setNetwork]);
 
   const handleConnectPolkadot = () => {
     setNetwork("polkadot")

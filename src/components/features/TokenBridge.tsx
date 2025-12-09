@@ -48,7 +48,7 @@ import { createClient as createSubstrateClient } from "polkadot-api";
 import { getWsProvider } from "polkadot-api/ws-provider/web";
 import { useEvmCall } from "@/hooks/useEvmCall";
 import { convertSS58ToH160 } from "@/lib/utils";
-import { EVM_TO_SUBSTRATE, SUBSTRATE_TO_EVM, useEvmChainIcons } from "@/config/chainMapping";
+import { EVM_TO_SUBSTRATE, POLKAVM_TO_POLKADOT, SUBSTRATE_TO_EVM, useEvmChainIcons } from "@/config/chainMapping";
 
 export function TokenBridge() {
   
@@ -116,6 +116,15 @@ export function TokenBridge() {
     }
   };
 
+
+  const isPolkaVMNetwork = (network: any) => {
+    return typeof network?.chainId === "number";
+  };
+
+  const isSubstrateNetwork = (network: any) => {
+    return typeof network?.genesisHash === "string"; // Substrate chain
+  };
+
   
   const getChainIcon = (chain: any, evmIcons: Record<number, string>) => {
 
@@ -129,20 +138,56 @@ export function TokenBridge() {
 
     return "/icons/default-chain.svg";
   };
-const evmIcons = useEvmChainIcons();
-  const [fromNetwork, setFromNetwork] = useState(FROM_NETWORKS[0]);
-  const [toNetwork, setToNetwork] = useState(() => {
-    const correspondingToNetwork = TO_NETWORKS.find((toNetwork) => {
-      if (FROM_NETWORKS[0].id === "paseoPassetHub")
-        return toNetwork.id === "passet";
-      if (FROM_NETWORKS[0].id === "westendAssetHub")
-        return toNetwork.id === "wah";
-      if (FROM_NETWORKS[0].id === "kusamaAssetHub")
-        return toNetwork.id === "kah";
-      return false;
-    });
-    return correspondingToNetwork || TO_NETWORKS[0];
-  });
+  const evmIcons = useEvmChainIcons();
+  const [fromNetwork, setFromNetwork] = useState<any>(null);
+  const [toNetwork, setToNetwork] = useState<any>(null);
+  const substrateChains = useChains();
+
+
+useEffect(() => {
+  if (!fromNetwork) {
+    setToNetwork(null);
+    return;
+  }
+
+  // CASE SUBSTRATE → EVM
+  if ("genesisHash" in fromNetwork && fromNetwork.genesisHash) {
+    const match = Object.entries(POLKAVM_TO_POLKADOT).find(
+      ([evmId, hash]) => hash === fromNetwork.genesisHash
+    );
+
+    if (match) {
+      const evmId = Number(match[0]);
+      const target = evmChains.find(c => c.id === evmId);
+      if (target) {
+        setToNetwork(target);
+        return;
+      }
+    }
+  }
+
+  // CASE EVM → SUBSTRATE
+  if ("id" in fromNetwork && typeof fromNetwork.id === "number") {
+    const substrateName = EVM_TO_SUBSTRATE[fromNetwork.id];
+    if (substrateName) {
+      const target = substrateChains.find(c => c.name === substrateName);
+      if (target) {
+        setToNetwork(target);
+        return;
+      }
+    }
+  }
+
+  setToNetwork(null);
+}, [fromNetwork, evmChains, substrateChains]);
+
+
+useEffect(() => {
+  if (fromNetwork) {
+    setToNetwork(fromNetwork);
+  }
+}, [fromNetwork]);
+  
   const [selectedToken, setSelectedToken] = useState({
     symbol: FROM_NETWORKS[0].symbol,
     name: `${FROM_NETWORKS[0].name} Token`,
@@ -175,8 +220,8 @@ const evmIcons = useEvmChainIcons();
 
   // EVM call hook for PolkaVM to Substrate bridging
   // Only initialize evmCall for PolkaVM to Substrate transfers
-  const isFromPolkaVM = TO_NETWORKS.some(network => network.id === fromNetwork.id);
-  const isToSubstrate = FROM_NETWORKS.some(network => network.id === toNetwork.id);
+  const isFromPolkaVM = isPolkaVMNetwork(fromNetwork);
+  const isToSubstrate = isSubstrateNetwork(toNetwork);
 
   console.log("🔧 EVM Call initialization:");
   console.log("- isFromPolkaVM:", isFromPolkaVM);
@@ -202,45 +247,67 @@ const evmIcons = useEvmChainIcons();
   });
 
   const getTokenName = (network: any) => {
-    if (network.displayName) {
-      const baseName = network.displayName.replace(/PolkaVM\s+/i, '').replace(/\s+Asset Hub/i, '');
-      return `PolkaVM ${baseName} Token`;
-    } else {
-      return `${network.name} Token`;
-    }
-  };
+  if (!network) return "";
 
-  const swapNetworks = () => {
-    // Determine if we're switching FROM substrate TO polkavm or vice versa
-    const isFromSubstrate = FROM_NETWORKS.some(n => n.id === fromNetwork.id);
-    const isToPolkaVM = TO_NETWORKS.some(n => n.id === toNetwork.id);
+  const rawName =
+    network.displayName ||
+    network.name ||
+    network.id ||
+    "Unknown";
 
-    // Disconnect appropriate wallet
-    if (isFromSubstrate && isToPolkaVM) {
-      // Switching from Substrate to PolkaVM, disconnect Substrate wallet
-      disconnectSubstrate();
-    } else if (!isFromSubstrate && !isToPolkaVM) {
-      // Switching from PolkaVM to Substrate, disconnect EVM wallet
-      disconnectEvm();
-    }
+  // Loại bỏ chữ PolkaVM ở đầu, nếu có
+  let cleanName = rawName.replace(/^PolkaVM\s*/i, "");
 
-    setIsReversed(!isReversed);
+  // Loại bỏ từ "Asset Hub" ở cuối, nếu có
+  cleanName = cleanName.replace(/\s*Asset Hub$/i, "");
 
-    const tempFrom = fromNetwork;
-    setFromNetwork(toNetwork);
-    setToNetwork(tempFrom);
+  // Trim lại tên
+  cleanName = cleanName.trim();
 
-    setSelectedToken({
-      symbol: toNetwork.symbol,
-      name: getTokenName(toNetwork),
-      price: "$",
-      chainIconUrl: toNetwork.chainIconUrl,
-    });
+  // Nếu sau khi xử lý rỗng → fallback
+  if (!cleanName) cleanName = rawName;
 
-    if (address) {
-      switchChain(toNetwork.id);
-    }
-  };
+  return `PolkaVM ${cleanName} Token`;
+};
+
+
+ const swapNetworks = () => {
+  // ⭐ 1. Chặn null để tránh crash
+  if (!fromNetwork || !toNetwork) return;
+
+  // ⭐ 2. Lấy type an toàn
+  const fromType = fromNetwork.type ?? null;
+  const toType = toNetwork.type ?? null;
+
+  // ⭐ 3. Ngắt kết nối đúng hướng
+  if (fromType === "evm" && toType !== "evm") {
+    disconnectEvm?.();
+  } else if (fromType !== "evm" && toType === "evm") {
+    disconnectSubstrate?.();
+  }
+
+  // ⭐ 4. Toggle
+  setIsReversed(prev => !prev);
+
+  // ⭐ 5. Swap mạng
+  const newFrom = toNetwork;
+  const newTo = fromNetwork;
+
+  setFromNetwork(newFrom);
+  setToNetwork(newTo);
+
+  // ⭐ 6. Update token dựa trên mạng mới
+  setSelectedToken({
+    symbol: newFrom.symbol,
+    name: getTokenName(newFrom),
+    price: "$",
+    chainIconUrl: newFrom.chainIconUrl,
+  });
+
+  // ⭐ 7. Đổi chain trong wallet (nếu có)
+  switchChain?.(newFrom.id);
+};
+
 
   const handleFromNetworkSelect = (network: any) => {
     setFromNetwork(network);
@@ -315,273 +382,314 @@ const evmIcons = useEvmChainIcons();
     return /^[1-9A-HJ-NP-Za-km-z]{47,48}$/.test(address);
   };
 
-  const getAddressValidation = () => {
-    const isToPolkaVM = TO_NETWORKS.some(network => network.id === toNetwork.id);
+ 
 
-    console.log("isToPolkaVM", isToPolkaVM);
-    console.log("isValidEvmAddress", isValidEvmAddress);
-    console.log("isValidSubstrateAddress", isValidSubstrateAddress);
-    return isToPolkaVM ? isValidEvmAddress : isValidSubstrateAddress;
-  };
+const getAddressValidation = () => {
+  if (!toNetwork) return () => true;
+
+  return toNetwork.type === "evm"
+    ? isValidEvmAddress
+    : isValidSubstrateAddress;
+};
+
+
 
   const getAddressPlaceholder = () => {
-    const isToPolkaVM = TO_NETWORKS.some(network => network.id === toNetwork.id);
-    return isToPolkaVM ? "Your EVM address here" : "Your Substrate address here";
-  };
+  if (!toNetwork) return "Connect your wallet first…";
+
+  return toNetwork.type === "evm"
+    ? "Your EVM address here"
+    : "Your Substrate address here";
+};
+
 
   const getAddressLabel = () => {
-    const isToPolkaVM = TO_NETWORKS.some(network => network.id === toNetwork.id);
-    return isToPolkaVM ? "PolkaVM Address" : "Substrate Address";
-  };
+  return toNetwork?.type === "evm"
+    ? "PolkaVM Address"
+    : "Substrate Address";
+};
+
 
   const fetchEvmBalance = async (address: string, toNetworkId: string) => {
-    if (!isValidEvmAddress(address)) return;
+  if (!isValidEvmAddress(address)) return;
 
-    setIsLoadingEvmBalance(true);
-    try {
-      const polkavmChain =
-        POLKAVM_CHAINS[toNetworkId as keyof typeof POLKAVM_CHAINS];
-      if (!polkavmChain) return;
+  setIsLoadingEvmBalance(true);
 
-      const client = createPublicClient({
-        transport: http(polkavmChain.rpcUrl),
-      });
-      const balance = await client.getBalance({ address: address as `0x${string}` });
-      const formattedBalance = formatEther(balance);
-
-      setEvmBalance(formattedBalance);
-    } catch (error) {
-      console.error("Failed to fetch EVM balance:", error);
-      setEvmBalance(null);
-    } finally {
-      setIsLoadingEvmBalance(false);
-    }
-  };
-
-  const fetchSubstrateBalance = async (address: string, toNetworkId: string) => {
-    if (!isValidSubstrateAddress(address)) return;
-
-    setIsLoadingSubstrateBalance(true);
-    try {
-      // Find the corresponding chain for the TO network
-      const chain = Object.values(CHAINS).find(chain => chain.id === toNetworkId);
-      if (!chain) return;
-
-      console.log("Initializing client for chain:", chain.name);
-
-      const substrateClient = createSubstrateClient(
-        getWsProvider(chain.rpcUrls.webSocket[0], (_status) => {
-          switch (_status.type) {
-            case 0:
-              console.info('⚫️ Connecting to ==> ', chain.name);
-              break;
-          }
-        })
-      );
-      // Fetch balance using the current client and chain
-      const accountInfo = await (substrateClient as any).getTypedApi(chain.descriptors).query.System.Account.getValue(address);
-
-      const decimals = chain.nativeCurrency.decimals;
-      const total = BigInt(accountInfo.data.free) - BigInt(accountInfo.data.frozen || 0);
-      const formattedTotal = (Number(total) / 10 ** decimals).toFixed(4);
-
-      setSubstrateBalance(formattedTotal);
-    } catch (error) {
-      console.error("Failed to fetch Substrate balance:", error);
-      setSubstrateBalance(null);
-    } finally {
-      setIsLoadingSubstrateBalance(false);
-    }
-  };
-
-  useEffect(() => {
-    const validateAddress = getAddressValidation();
-    if (recipientAddress && validateAddress(recipientAddress)) {
-      const isToPolkaVM = TO_NETWORKS.some(network => network.id === toNetwork.id);
-      if (isToPolkaVM) {
-        // TO network is PolkaVM, fetch EVM balance
-        fetchEvmBalance(recipientAddress, toNetwork.id);
-        setSubstrateBalance(null);
-      } else {
-        // TO network is Substrate, fetch Substrate balance
-        fetchSubstrateBalance(recipientAddress, toNetwork.id);
-        setEvmBalance(null);
-      }
-    } else {
-      setEvmBalance(null);
-      setSubstrateBalance(null);
-    }
-  }, [recipientAddress, toNetwork.id, fromNetwork.id]);
-
-  const bridgeTokens = async () => {
-    const validateAddress = getAddressValidation();
-    console.log("Validate Address:", validateAddress(recipientAddress));
-    console.log("Recipient Address:", recipientAddress);
-    console.log("Amount:", amount);
-    console.log("Address:", address);
-    // Determine bridge direction
-    const isFromPolkaVM = TO_NETWORKS.some(network => network.id === fromNetwork.id);
-    const isToSubstrate = FROM_NETWORKS.some(network => network.id === toNetwork.id);
-
-    if (isFromPolkaVM && isToSubstrate) {
-      if (!evmAddress) {
-        console.log("❌ No EVM address available for PolkaVM to Substrate bridge");
-        setBridgeError("Please connect your EVM wallet to bridge from PolkaVM to Substrate");
-        return;
-      }
-    }
-    else {
-      if(!address) {
-        console.log("❌ No Substrate address available for Substrate to PolkaVM bridge");
-        setBridgeError("Please connect your Substrate wallet to bridge from Substrate to PolkaVM");
-        return;
-      }
-    }
-
-    
-    if (
-      !recipientAddress ||
-      !amount ||
-      !validateAddress(recipientAddress)
-    ) {
-      setBridgeError("Please fill in all required fields with valid values");
+  try {
+    // Lấy chain config từ toNetworkId
+    const polkavmChain = POLKAVM_CHAINS[toNetworkId as keyof typeof POLKAVM_CHAINS];
+    if (!polkavmChain) {
+      console.error("PolkaVM chain not found for id:", toNetworkId);
       return;
     }
 
-    console.log("🚀 Starting bridge process...");
-    setIsBridging(true);
-    setBridgeError(null);
-    setShowTransactionDialog(true);
-    setCurrentTxHash(null);
+    // Tạo client EVM
+    const client = createPublicClient({
+      transport: http(polkavmChain.rpcUrl),
+    });
 
-    try {
-      console.log("🔍 Bridge direction check:");
-      console.log("- isFromPolkaVM:", isFromPolkaVM);
-      console.log("- isToSubstrate:", isToSubstrate);
-      console.log("- fromNetwork.id:", fromNetwork.id);
-      console.log("- toNetwork.id:", toNetwork.id);
+    // Type an toàn cho địa chỉ EVM
+    const evmAddress = address as `0x${string}`;
 
-      if (isFromPolkaVM && isToSubstrate) {
-        console.log("🌉 PolkaVM to Substrate bridge detected");
-        // PolkaVM to Substrate bridge using EVM call - single step only
-        setIsPolkaVMToSubstrate(true);
+    // Fetch balance
+    const balance = await client.getBalance({ address: evmAddress });
+
+    // Convert sang ETH
+    const formattedBalance = formatEther(balance);
+
+    setEvmBalance(formattedBalance);
+  } catch (error: unknown) {
+    console.error("❌ Failed to fetch EVM balance:", error);
+    setEvmBalance(null);
+  } finally {
+    setIsLoadingEvmBalance(false);
+  }
+};
+
+
+  const fetchSubstrateBalance = async (address: string, toNetworkId: string) => {
+  if (!isValidSubstrateAddress(address)) return;
+
+  setIsLoadingSubstrateBalance(true);
+
+  try {
+    const chain = Object.values(CHAINS).find(c => c.id === toNetworkId);
+    if (!chain) {
+      console.error("Chain not found for:", toNetworkId);
+      return;
+    }
+
+    console.log("⏳ Initializing client for:", chain.name);
+
+    const provider = getWsProvider(
+      chain.rpcUrls.webSocket[0],
+      (status) => {
+        if (status.type === 0) {
+          console.log("⚫️ Connecting to:", chain.name);
+        }
+      }
+    );
+
+    const substrateClient = createSubstrateClient(provider);
+
+    // ❗ FIX: ép kiểu để tránh TS báo unknown
+    const api = await substrateClient.getTypedApi(chain.descriptors) as any;
+
+    // Account info
+    const accountInfo = await api.query.System.Account.getValue(address);
+
+    const decimals = chain.nativeCurrency.decimals;
+
+    const free = BigInt(accountInfo.data.free ?? 0n);
+    const frozen = BigInt(accountInfo.data.frozen ?? 0n);
+
+    const total = free - frozen;
+    const formattedTotal = (Number(total) / 10 ** decimals).toFixed(4);
+
+    setSubstrateBalance(formattedTotal);
+  } catch (error) {
+    console.error("❌ Failed to fetch Substrate balance:", error);
+    setSubstrateBalance(null);
+  } finally {
+    setIsLoadingSubstrateBalance(false);
+  }
+};
+
+  console.log("toNetwork = ", toNetwork);
+  console.log("toNetwork.type = ", toNetwork?.type);
+  console.log("Will use validator: ", toNetwork?.type === "evm" ? "EVM" : "Substrate");
+
+
+  useEffect(() => {
+  const validateAddress = getAddressValidation();
+
+  if (!recipientAddress || !validateAddress(recipientAddress)) {
+    setEvmBalance(null);
+    setSubstrateBalance(null);
+    return;
+  }
+
+  const isToPolkaVM = isPolkaVMNetwork(toNetwork);
+  const isToSubstrate = isSubstrateNetwork(toNetwork);
+
+  console.log("DEBUG:", {
+    recipientAddress,
+    toNetwork,
+    isToPolkaVM,
+    isToSubstrate
+  });
+
+  if (isToPolkaVM) {
+    // EVM balance
+    fetchEvmBalance(recipientAddress, toNetwork.chainId);
+    setSubstrateBalance(null);
+  } else if (isToSubstrate) {
+    // Substrate balance
+    fetchSubstrateBalance(recipientAddress, toNetwork.genesisHash);
+    setEvmBalance(null);
+  }
+}, [recipientAddress, toNetwork]);
+
+
+  const bridgeTokens = async () => {
+  const validateAddress = getAddressValidation();
+
+  // 🔍 Check inputs
+  if (!recipientAddress || !amount || !validateAddress(recipientAddress)) {
+    setBridgeError("Please fill in all required fields with valid values");
+    return;
+  }
+
+  if (!fromNetwork || !toNetwork) {
+    setBridgeError("Network information is missing");
+    return;
+  }
+
+  // 🔥 Detect direction using REAL chain data
+  const isFromPolkaVM = fromNetwork.type === "evm";
+  const isToSubstrate = toNetwork.type === "substrate";
+
+  // Validate account availability
+  if (isFromPolkaVM && !evmAddress) {
+    setBridgeError("Please connect your EVM wallet to bridge from PolkaVM");
+    return;
+  }
+
+  if (!isFromPolkaVM && !address) {
+    setBridgeError("Please connect your Substrate wallet");
+    return;
+  }
+
+  console.log("🚀 Starting bridge process...");
+  setIsBridging(true);
+  setBridgeError(null);
+  setShowTransactionDialog(true);
+  setCurrentTxHash(null);
+
+  try {
+    console.log("🔍 Bridge direction:", {
+      isFromPolkaVM,
+      isToSubstrate,
+      from: fromNetwork.id,
+      to: toNetwork.id,
+    });
+
+    // --------------------------------------------------------
+    // 🌉 CASE 1: PolkaVM → Substrate (EVM call → DONE)
+    // --------------------------------------------------------
+    if (isFromPolkaVM && isToSubstrate) {
+      setIsPolkaVMToSubstrate(true);
+
+      setTransactionSteps({
+        mapAccount: { status: "completed", txHash: null },
+        call: { status: "active", txHash: null },
+      });
+
+      console.log("📞 Executing EVM bridge call...");
+
+      const txHash = await evmCall.execute();
+
+      console.log("✅ Sent EVM tx:", txHash);
+      setCurrentTxHash(txHash || null);
+
+      const receipt = await evmCall.waitForReceipt();
+
+      console.log("📦 Receipt:", receipt);
+
+      setTransactionSteps(prev => ({
+        ...prev,
+        call: { status: "completed", txHash },
+      }));
+
+      console.log("🎉 PolkaVM → Substrate bridge completed!");
+    }
+
+    // --------------------------------------------------------
+    // 🌉 CASE 2: Substrate → PolkaVM (map account + deposit)
+    // --------------------------------------------------------
+    else {
+      setIsPolkaVMToSubstrate(false);
+
+      const alreadyMapped = await isMappedAccount();
+
+      if (alreadyMapped) {
+        console.log("🔗 Account already mapped, skipping mapping");
+
         setTransactionSteps({
           mapAccount: { status: "completed", txHash: null },
           call: { status: "active", txHash: null },
         });
 
-        console.log("📞 Executing EVM call...");
-        console.log("- evmCall state before execution:", {
-          to: evmCall.to,
-          value: evmCall.value,
-          isReady: evmCall.isReady,
-          isLoading: evmCall.isLoading,
-          error: evmCall.error
-        });
+        const depositResult = await depositAccount(recipientAddress, amount);
 
-        const txHash = await evmCall.execute();
-        console.log("✅ EVM call executed, transaction hash received:", txHash);
-
-        setCurrentTxHash(txHash || null);
-        console.log("📝 Setting current transaction hash:", txHash);
-
-        // Wait for transaction receipt to confirm success
-        console.log("⏳ Waiting for transaction receipt...");
-        const receipt = await evmCall.waitForReceipt();
-
-        console.log("✅ Transaction receipt received:", receipt);
-        console.log("- Status:", receipt.status);
-
-        setTransactionSteps((prev) => ({
+        setTransactionSteps(prev => ({
           ...prev,
           call: {
             status: "completed",
-            txHash: txHash || null,
-          },
+            txHash: depositResult.transactionHash,
+          }
         }));
-        console.log("✅ Transaction steps updated to completed");
+
+        setCurrentTxHash(depositResult.transactionHash);
       } else {
-        // Substrate to PolkaVM bridge (existing logic)
-        setIsPolkaVMToSubstrate(false);
-        const isAlreadyMapped = await isMappedAccount();
+        console.log("🔗 Mapping account...");
 
-        if (isAlreadyMapped) {
-          setTransactionSteps({
-            mapAccount: { status: "completed", txHash: null },
-            call: { status: "pending", txHash: null },
-          });
+        setTransactionSteps({
+          mapAccount: { status: "active", txHash: null },
+          call: { status: "pending", txHash: null },
+        });
 
-          setTransactionSteps((prev) => ({
-            ...prev,
-            call: { status: "active", txHash: null },
-          }));
+        const mapResult = await mapAccount();
 
-          const depositResult = await depositAccount(recipientAddress, amount);
+        setTransactionSteps(prev => ({
+          ...prev,
+          mapAccount: {
+            status: "completed",
+            txHash: mapResult.transactionHash,
+          }
+        }));
 
-          setTransactionSteps((prev) => ({
-            ...prev,
-            call: {
-              status: "completed",
-              txHash: depositResult.transactionHash,
-            },
-          }));
-          setCurrentTxHash(depositResult.transactionHash);
-        } else {
-          setTransactionSteps({
-            mapAccount: { status: "pending", txHash: null },
-            call: { status: "pending", txHash: null },
-          });
+        setCurrentTxHash(mapResult.transactionHash);
 
-          setTransactionSteps((prev) => ({
-            ...prev,
-            mapAccount: { status: "active", txHash: null },
-          }));
+        console.log("💰 Depositing after mapping...");
 
-          const mapResult = await mapAccount();
+        setTransactionSteps(prev => ({
+          ...prev,
+          call: { status: "active", txHash: null },
+        }));
 
-          setTransactionSteps((prev) => ({
-            ...prev,
-            mapAccount: {
-              status: "completed",
-              txHash: mapResult.transactionHash,
-            },
-          }));
-          setCurrentTxHash(mapResult.transactionHash);
+        const depositResult = await depositAccount(recipientAddress, amount);
 
-          setTransactionSteps((prev) => ({
-            ...prev,
-            call: { status: "active", txHash: null },
-          }));
+        setTransactionSteps(prev => ({
+          ...prev,
+          call: {
+            status: "completed",
+            txHash: depositResult.transactionHash,
+          }
+        }));
 
-          const depositResult = await depositAccount(recipientAddress, amount);
-
-          setTransactionSteps((prev) => ({
-            ...prev,
-            call: {
-              status: "completed",
-              txHash: depositResult.transactionHash,
-            },
-          }));
-          setCurrentTxHash(depositResult.transactionHash);
-        }
+        setCurrentTxHash(depositResult.transactionHash);
       }
-
-      console.log("🎉 Bridge process completed successfully!");
-      setTimeout(() => {
-        console.log("🔄 Closing transaction dialog and resetting state...");
-        setShowTransactionDialog(false);
-        setIsBridging(false);
-        refreshBalance();
-        setAmount("");
-      }, 2000);
-    } catch (error) {
-      console.error("Bridge transaction failed:", error);
-      setBridgeError(
-        error instanceof Error ? error.message : "Transaction failed"
-      );
-      setIsBridging(false);
     }
-  };
+
+    // --------------------------------------------------------
+    // Final UI cleanup
+    // --------------------------------------------------------
+    setTimeout(() => {
+      setShowTransactionDialog(false);
+      setIsBridging(false);
+      refreshBalance();
+      setAmount("");
+    }, 2000);
+
+  } catch (error) {
+    console.error("❌ Bridge error:", error);
+
+    setBridgeError(error instanceof Error ? error.message : "Transaction failed");
+    setIsBridging(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen network-grid">
@@ -1009,14 +1117,16 @@ const evmIcons = useEvmChainIcons();
               <div className="text-2xl font-mono text-muted-foreground">
                 {amount || "0.0"}
               </div>
+
               <div className="text-sm text-muted-foreground mt-1">
-                {TO_NETWORKS.some(network => network.id === toNetwork.id) ? (
+                {toNetwork && typeof toNetwork.chainId === "number" ? (
                   <>You will receive ≈ {amount || "0.0"} PolkaVM {selectedToken.symbol}</>
                 ) : (
                   <>You will receive ≈ {amount || "0.0"} {selectedToken.symbol}</>
                 )}
               </div>
             </Card>
+
           </div>
 
           {/* Recipient Address Section */}
@@ -1063,14 +1173,18 @@ const evmIcons = useEvmChainIcons();
             )}
 
             {/* Balance Display */}
-            {recipientAddress && getAddressValidation()(recipientAddress) && (
+           {toNetwork &&
+            recipientAddress &&
+            getAddressValidation()(recipientAddress) && (
               <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <span>Balance on {toNetwork.name}:</span>
+
                 {(() => {
-                  const isToPolkaVM = TO_NETWORKS.some(network => network.id === toNetwork.id);
+                  // Không dùng TO_NETWORKS nữa → dùng type thật
+                  const isToPolkaVM = toNetwork.type === "evm";
 
                   if (isToPolkaVM) {
-                    // TO network is PolkaVM, show EVM balance
+                    // TO network is PolkaVM → hiển thị EVM balance
                     return isLoadingEvmBalance ? (
                       <span>Loading...</span>
                     ) : evmBalance !== null ? (
@@ -1080,21 +1194,22 @@ const evmIcons = useEvmChainIcons();
                     ) : (
                       <span>0.0000 {toNetwork.symbol}</span>
                     );
-                  } else {
-                    // TO network is Substrate, show Substrate balance
-                    return isLoadingSubstrateBalance ? (
-                      <span>Loading...</span>
-                    ) : substrateBalance !== null ? (
-                      <span className="font-medium text-primary">
-                        {substrateBalance} {toNetwork.symbol}
-                      </span>
-                    ) : (
-                      <span>0.0000 {toNetwork.symbol}</span>
-                    );
                   }
+
+                  // TO network là Substrate → hiển thị Substrate balance
+                  return isLoadingSubstrateBalance ? (
+                    <span>Loading...</span>
+                  ) : substrateBalance !== null ? (
+                    <span className="font-medium text-primary">
+                      {substrateBalance} {toNetwork.symbol}
+                    </span>
+                  ) : (
+                    <span>0.0000 {toNetwork.symbol}</span>
+                  );
                 })()}
               </div>
             )}
+
 
             <p className="text-xs text-muted-foreground">
               Enter the PolkaVM address where you want to receive your tokens.
