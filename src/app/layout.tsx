@@ -8,6 +8,7 @@ import '@luno-kit/ui/styles.css';
 import '@rainbow-me/rainbowkit/styles.css';
 
 import './globals.css'
+import { ToastProvider } from '@/providers/ToastProviders'
 import CustomWalletConnect from '@/components/features/CustomWalletConnect'
 
 export const metadata: Metadata = {
@@ -24,13 +25,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <SubstrateKitProviders>
-          <WagmiProvider>
-            <CustomWalletConnect /> 
-            {children}
-            <Toaster />
-          </WagmiProvider>
-        </SubstrateKitProviders>
+        <ToastProvider>
+          <SubstrateKitProviders>
+            <WagmiProvider>
+              <CustomWalletConnect />
+              {children}
+              <Toaster />
+            </WagmiProvider>
+          </SubstrateKitProviders>
+        </ToastProvider>
       </body>
     </html>
   )
