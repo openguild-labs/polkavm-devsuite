@@ -129,25 +129,34 @@ export function TokenBridge() {
 
     return "/icons/default-chain.svg";
   };
-const evmIcons = useEvmChainIcons();
-  const [fromNetwork, setFromNetwork] = useState(FROM_NETWORKS[0]);
-  const [toNetwork, setToNetwork] = useState(() => {
-    const correspondingToNetwork = TO_NETWORKS.find((toNetwork) => {
-      if (FROM_NETWORKS[0].id === "paseoPassetHub")
-        return toNetwork.id === "passet";
-      if (FROM_NETWORKS[0].id === "westendAssetHub")
-        return toNetwork.id === "wah";
-      if (FROM_NETWORKS[0].id === "kusamaAssetHub")
-        return toNetwork.id === "kah";
-      return false;
-    });
-    return correspondingToNetwork || TO_NETWORKS[0];
+  const evmIcons = useEvmChainIcons();
+  const [fromNetwork, setFromNetwork] = useState<any>(() => {
+  return isEvm ? evmChain : substrateChain;
+});
+
+  const [toNetwork, setToNetwork] = useState<any>(() => {
+    // Nếu đang ở Substrate → map sang EVM
+    if (!isEvm && substrateChain) {
+      const targetEvmId = SUBSTRATE_TO_EVM[substrateChain.name];
+      const target = evmChains.find(c => c.id === targetEvmId);
+      return target ?? evmChains[0]; 
+    }
+
+    // Nếu đang ở EVM → map sang Substrate
+    if (isEvm && evmChain) {
+      const targetSubstrateName = EVM_TO_SUBSTRATE[evmChain.id];
+      const target = chains.find(c => c.name === targetSubstrateName);
+      return target ?? chains[0]; 
+    }
+
+    return evmChains[0] || chains[0] || {};
   });
+
   const [selectedToken, setSelectedToken] = useState({
-    symbol: FROM_NETWORKS[0].symbol,
-    name: `${FROM_NETWORKS[0].name} Token`,
+    symbol: "",
+    name: "",
     price: "$",
-    chainIconUrl: CHAINS.westendAssetHub.nativeCurrency.tokenUrl,
+    chainIconUrl: "",
   });
   const [amount, setAmount] = useState("");
   const [recipientAddress, setRecipientAddress] = useState("");
@@ -218,21 +227,18 @@ const evmIcons = useEvmChainIcons();
   };
 
   const swapNetworks = () => {
-    // Determine if we're switching FROM substrate TO polkavm or vice versa
-    const isFromSubstrate = FROM_NETWORKS.some(n => n.id === fromNetwork.id);
-    const isToPolkaVM = TO_NETWORKS.some(n => n.id === toNetwork.id);
+    if (!fromNetwork || !toNetwork) return;
 
-    // Disconnect appropriate wallet
-    if (isFromSubstrate && isToPolkaVM) {
-      // Switching from Substrate to PolkaVM, disconnect Substrate wallet
-      disconnectSubstrate();
-    } else if (!isFromSubstrate && !isToPolkaVM) {
-      // Switching from PolkaVM to Substrate, disconnect EVM wallet
+    const isFromPolkaVM = isEvmChain(fromNetwork) || isEvm;
+    const isToSubstrate = isSubstrateChain(toNetwork) || !isEvm;
+
+    if (isFromPolkaVM && isToSubstrate) {
       disconnectEvm();
+    } else if (!isFromPolkaVM && !isToSubstrate) {
+      disconnectSubstrate();
     }
 
     setIsReversed(!isReversed);
-
     const tempFrom = fromNetwork;
     setFromNetwork(toNetwork);
     setToNetwork(tempFrom);
@@ -245,38 +251,43 @@ const evmIcons = useEvmChainIcons();
     });
 
     if (address) {
-      switchChain(toNetwork.id);
+      switchChain(); 
     }
   };
 
+
   const handleFromNetworkSelect = (network: any) => {
     setFromNetwork(network);
+    const correspondingToNetworkIdMap: Record<string, string> = {
+      paseoPassetHub: "passet",
+      westendAssetHub: "wah",
+      kusamaAssetHub: "kah",
+      passet: "paseoPassetHub",
+      wah: "westendAssetHub",
+      kah: "kusamaAssetHub",
+    };
 
-    const correspondingToNetwork = [...FROM_NETWORKS, ...TO_NETWORKS].find((otherNetwork) => {
-      if (network.id === "paseoPassetHub") return otherNetwork.id === "passet";
-      if (network.id === "westendAssetHub") return otherNetwork.id === "wah";
-      if (network.id === "kusamaAssetHub") return otherNetwork.id === "kah";
-      if (network.id === "passet") return otherNetwork.id === "paseoPassetHub";
-      if (network.id === "wah") return otherNetwork.id === "westendAssetHub";
-      if (network.id === "kah") return otherNetwork.id === "kusamaAssetHub";
-      return false;
-    });
+    const correspondingToNetworkId = correspondingToNetworkIdMap[network.id];
+    let correspondingToNetwork: any = null;
+    if (correspondingToNetworkId) {
+      correspondingToNetwork =
+        CHAINS[correspondingToNetworkId as keyof typeof CHAINS] ||
+        POLKAVM_CHAINS[correspondingToNetworkId as keyof typeof POLKAVM_CHAINS];
+    }
 
     if (correspondingToNetwork) {
       setToNetwork(correspondingToNetwork);
     }
-
     setSelectedToken({
       symbol: network.symbol,
       name: getTokenName(network),
       price: "$",
       chainIconUrl:
-        CHAINS[network.id as keyof typeof CHAINS]?.nativeCurrency.tokenUrl ||
+        (CHAINS[network.id as keyof typeof CHAINS]?.nativeCurrency.tokenUrl as string) ||
         network.chainIconUrl,
     });
-
     if (address) {
-      switchChain(network.id);
+      switchChain();
     }
   };
 
@@ -444,7 +455,7 @@ const evmIcons = useEvmChainIcons();
     console.log("Validate Address:", validateAddress(recipientAddress));
     console.log("Recipient Address:", recipientAddress);
     console.log("Amount:", amount);
-    console.log("Address:", address);
+    console.log("Address123:", address);
 
     
     const isFromPolkaVM = isEvm;          
@@ -1019,7 +1030,7 @@ const evmIcons = useEvmChainIcons();
                 {amount || "0.0"}
               </div>
               <div className="text-sm text-muted-foreground mt-1">
-                {TO_NETWORKS.some(network => network.id === toNetwork.id) ? (
+                {isToSubstrate ? (
                   <>You will receive ≈ {amount || "0.0"} PolkaVM {selectedToken.symbol}</>
                 ) : (
                   <>You will receive ≈ {amount || "0.0"} {selectedToken.symbol}</>
@@ -1075,35 +1086,33 @@ const evmIcons = useEvmChainIcons();
             {recipientAddress && getAddressValidation()(recipientAddress) && (
               <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <span>Balance on {toNetwork.name}:</span>
-                {(() => {
-                  const isToPolkaVM = TO_NETWORKS.some(network => network.id === toNetwork.id);
 
-                  if (isToPolkaVM) {
-                    // TO network is PolkaVM, show EVM balance
-                    return isLoadingEvmBalance ? (
-                      <span>Loading...</span>
-                    ) : evmBalance !== null ? (
-                      <span className="font-medium text-primary">
-                        {parseFloat(evmBalance).toFixed(4)} {toNetwork.symbol}
-                      </span>
-                    ) : (
-                      <span>0.0000 {toNetwork.symbol}</span>
-                    );
-                  } else {
-                    // TO network is Substrate, show Substrate balance
-                    return isLoadingSubstrateBalance ? (
-                      <span>Loading...</span>
-                    ) : substrateBalance !== null ? (
-                      <span className="font-medium text-primary">
-                        {substrateBalance} {toNetwork.symbol}
-                      </span>
-                    ) : (
-                      <span>0.0000 {toNetwork.symbol}</span>
-                    );
-                  }
-                })()}
+                {isEvmChain(toNetwork) ? (
+                  // TO network is PolkaVM/EVM → show EVM balance
+                  isLoadingEvmBalance ? (
+                    <span>Loading...</span>
+                  ) : evmBalance !== null ? (
+                    <span className="font-medium text-primary">
+                      {parseFloat(evmBalance).toFixed(4)} {toNetwork.symbol}
+                    </span>
+                  ) : (
+                    <span>0.0000 {toNetwork.symbol}</span>
+                  )
+                ) : (
+                  // TO network is Substrate → show Substrate balance
+                  isLoadingSubstrateBalance ? (
+                    <span>Loading...</span>
+                  ) : substrateBalance !== null ? (
+                    <span className="font-medium text-primary">
+                      {substrateBalance} {toNetwork.symbol}
+                    </span>
+                  ) : (
+                    <span>0.0000 {toNetwork.symbol}</span>
+                  )
+                )}
               </div>
             )}
+
 
             <p className="text-xs text-muted-foreground">
               Enter the PolkaVM address where you want to receive your tokens.
@@ -1137,7 +1146,13 @@ const evmIcons = useEvmChainIcons();
       {/* Transaction Progress Dialog */}
       <Dialog
         open={showTransactionDialog}
-        onOpenChange={setShowTransactionDialog}>
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsBridging(false);
+          }
+          setShowTransactionDialog(open);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-blue-600">

@@ -1,6 +1,6 @@
 // hooks/useEvmCall.ts
 import { useState, useEffect, useRef } from 'react';
-import { useSendTransaction, useWaitForTransactionReceipt, useBalance } from 'wagmi';
+import { useSendTransaction, useWaitForTransactionReceipt, useBalance, useAccount, useChainId } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
 import { Hash } from 'viem'; 
 
@@ -12,7 +12,8 @@ interface UseEvmCallProps {
 export function useEvmCall({ to, value }: UseEvmCallProps) {
   const [txHash, setTxHash] = useState<Hash | undefined>();
   const receiptResolverRef = useRef<((receipt: any) => void) | null>(null);
-  
+  const { address: evmAddress } = useAccount();
+  const evmChainId = useChainId();
   const { sendTransaction, isPending: isSending, error: sendError, reset } = useSendTransaction({
     mutation: {
       onSuccess: (hash) => {
@@ -29,7 +30,7 @@ export function useEvmCall({ to, value }: UseEvmCallProps) {
   const { data: txReceipt, isLoading: isConfirming } = useWaitForTransactionReceipt({
     hash: txHash,
   });
-  const { data: balance, isLoading: isLoadingBalance, refetch: refetchBalance } = useBalance();
+  const { data: balance, isLoading: isLoadingBalance, refetch: refetchBalance } = useBalance({ address: evmAddress });
 
   // Log transaction receipt when received and resolve promise
   useEffect(() => {
@@ -63,6 +64,8 @@ export function useEvmCall({ to, value }: UseEvmCallProps) {
       // Send the transaction
       sendTransaction(
         {
+          account: evmAddress,         
+          chainId: evmChainId, 
           to,
           value: parseEther(value),
         },
