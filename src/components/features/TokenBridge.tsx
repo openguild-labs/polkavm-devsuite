@@ -41,13 +41,13 @@ import {
 import { usePapiClient } from "@/hooks/usePapiClient";
 import { useAccount, useChain, useChains, useDisconnect } from "@luno-kit/react";
 import { useChainId, useConfig, useAccount as useEvmAccount, useSwitchChain} from "wagmi";
-import { createPublicClient, http, formatEther } from 'viem';
+import { createPublicClient, http, formatEther, webSocket } from 'viem';
 import { useDisconnect as useEvmDisconnect } from 'wagmi';
 import { useEffect } from "react";
 import { createClient as createSubstrateClient } from "polkadot-api";
 import { getWsProvider } from "polkadot-api/ws-provider/web";
 import { useEvmCall } from "@/hooks/useEvmCall";
-import { convertSS58ToH160 } from "@/lib/utils";
+import { convertSS58ToH160} from "@/lib/utils";
 import { EVM_TO_SUBSTRATE, SUBSTRATE_TO_EVM, useEvmChainIcons } from "@/config/chainMapping";
 
 export function TokenBridge() {
@@ -367,90 +367,103 @@ export function TokenBridge() {
       : "PolkaVM Address";
   };
 
-  const fetchEvmBalance = async (address: string, toNetworkId: string) => {
-    if (!isValidEvmAddress(address)) return;
-
+  const fetchEvmBalance = async (address: string, toChain: any) => {
+    console.log("[fetchEvmBalance] Called with:", address, toChain?.name);
+    if (!isValidEvmAddress(address)) {
+      console.warn("[fetchEvmBalance] Invalid EVM address:", address);
+      setEvmBalance(null);
+      return;
+    }
+    const rpcUrl =
+      toChain?.rpcUrl || 
+      toChain?.rpcUrls?.default?.http?.[0] ||
+      toChain?.rpcUrls?.webSocket?.[0];
+    if (!rpcUrl) {
+      console.warn("[fetchEvmBalance] RPC URL missing for chain:", toChain?.name);
+      setEvmBalance(null);
+      return;
+    }
     setIsLoadingEvmBalance(true);
     try {
-      const polkavmChain =
-        POLKAVM_CHAINS[toNetworkId as keyof typeof POLKAVM_CHAINS];
-      if (!polkavmChain) return;
-
-      const client = createPublicClient({
-        transport: http(polkavmChain.rpcUrl),
-      });
+      console.log("[fetchEvmBalance] Connecting to RPC URL:", rpcUrl);
+      const transport = rpcUrl.startsWith("http") ? http(rpcUrl) : webSocket(rpcUrl);
+      const client = createPublicClient({ transport });
       const balance = await client.getBalance({ address: address as `0x${string}` });
       const formattedBalance = formatEther(balance);
-
+      console.log("[fetchEvmBalance] Balance:", formattedBalance);
       setEvmBalance(formattedBalance);
     } catch (error) {
-      console.error("Failed to fetch EVM balance:", error);
+      console.error("[fetchEvmBalance] Failed to fetch EVM balance:", error);
       setEvmBalance(null);
     } finally {
       setIsLoadingEvmBalance(false);
     }
   };
 
-  const fetchSubstrateBalance = async (address: string, toNetworkId: string) => {
-    if (!isValidSubstrateAddress(address)) return;
+  const fetchSubstrateBalance = async (address: string, toChain: any) => {
+    if (!isValidSubstrateAddress(address)) {
+      console.warn("[fetchSubstrateBalance] Invalid Substrate address:", address);
+      setSubstrateBalance(null);
+      return;
+    }
+
+    const wsUrl = toChain?.rpcUrls?.webSocket?.[0];
+    if (!wsUrl) {
+      console.warn("[fetchSubstrateBalance] WebSocket URL missing for chain:", toChain?.name);
+      setSubstrateBalance(null);
+      return;
+    }
 
     setIsLoadingSubstrateBalance(true);
     try {
-      // Find the corresponding chain for the TO network
-      const chain = Object.values(CHAINS).find(chain => chain.id === toNetworkId);
-      if (!chain) return;
+      const substrateClient = createSubstrateClient(getWsProvider(wsUrl));
+      const api = await (substrateClient as any).getTypedApi(toChain.descriptors);
+      const accountInfo = await api.query.system.account.getValue(address);
 
-      console.log("Initializing client for chain:", chain.name);
+      const decimals = toChain.nativeCurrency?.decimals || 12;
+      const free = BigInt(accountInfo.data.free);
+      const frozen = BigInt(accountInfo.data.frozen || 0);
+      const total = free - frozen;
+      const formatted = (Number(total) / 10 ** decimals).toFixed(4);
 
-      const substrateClient = createSubstrateClient(
-        getWsProvider(chain.rpcUrls.webSocket[0], (_status) => {
-          switch (_status.type) {
-            case 0:
-              console.info('⚫️ Connecting to ==> ', chain.name);
-              break;
-          }
-        })
-      );
-      // Fetch balance using the current client and chain
-      const accountInfo = await (substrateClient as any).getTypedApi(chain.descriptors).query.System.Account.getValue(address);
-
-      const decimals = chain.nativeCurrency.decimals;
-      const total = BigInt(accountInfo.data.free) - BigInt(accountInfo.data.frozen || 0);
-      const formattedTotal = (Number(total) / 10 ** decimals).toFixed(4);
-
-      setSubstrateBalance(formattedTotal);
+      console.log(`[fetchSubstrateBalance] Balance on ${toChain.name}:`, formatted);
+      setSubstrateBalance(formatted);
     } catch (error) {
-      console.error("Failed to fetch Substrate balance:", error);
+      console.error("[fetchSubstrateBalance] Failed:", error);
       setSubstrateBalance(null);
     } finally {
       setIsLoadingSubstrateBalance(false);
     }
   };
 
-  
-  useEffect(() => {
-    const validateAddress = getAddressValidation();
-    if (!recipientAddress || !validateAddress(recipientAddress) || !toChain) {
-      setEvmBalance(null);
-      setSubstrateBalance(null);
-      return;
-    }
-    // CASE 1 — FROM EVM → TO SUBSTRATE
-    if (fromType === "EVM") {
-      console.log("Fetching Substrate balance for:", recipientAddress);
-      fetchSubstrateBalance(recipientAddress, toChain.genesisHash);
-      setEvmBalance(null);
-      return;
-    }
-    // CASE 2 — FROM SUBSTRATE → TO EVM
-    if (fromType === "SUBSTRATE") {
-      console.log("Fetching EVM balance for:", recipientAddress);
-      fetchEvmBalance(recipientAddress, toChain.id);
-      setSubstrateBalance(null);
-      return;
-    }
-  }, [recipientAddress, toChain, fromType]);
-
+  console.log("fromType:", fromType);
+  console.log("evmBalance:", evmBalance);
+  console.log("substrateBalance:", substrateBalance);
+  console.log("toChain:", toChain);
+    
+ useEffect(() => {
+  const validateAddress = getAddressValidation();
+  if (!recipientAddress || !validateAddress(recipientAddress) || !toChain) {
+    setEvmBalance(null);
+    setSubstrateBalance(null);
+    return;
+  }
+  // CASE 1 — FROM EVM → TO SUBSTRATE
+  if (fromType === "EVM") {
+  console.log("Fetching Substrate balance for:", recipientAddress);
+  // Reset evmBalance
+  setEvmBalance(null);
+  fetchSubstrateBalance(recipientAddress, toChain);
+  return;
+  }
+  // CASE 2 — FROM SUBSTRATE → TO EVM
+  if (fromType === "SUBSTRATE") {
+    console.log("Fetching EVM balance for:", recipientAddress);
+    setSubstrateBalance(null);
+    fetchEvmBalance(recipientAddress, toChain); 
+    return;
+  }
+ }, [recipientAddress, toChain, fromType]);
 
   const bridgeTokens = async () => {
     const validateAddress = getAddressValidation();
@@ -1077,43 +1090,44 @@ export function TokenBridge() {
 
             {/* Balance Display */}
             {recipientAddress &&
-              getAddressValidation()(recipientAddress) &&
-              toNetwork && (
-                <div className="text-sm text-muted-foreground flex items-center gap-2">
-                  <span>Balance on {toNetwork.name}:</span>
+            getAddressValidation()(recipientAddress) &&
+            toChain && (
+              <div className="text-sm text-muted-foreground flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span>Balance on {toChain.name}:</span>
 
-                  {isEvmChain(toNetwork) ? (
-                    // TO network is PolkaVM/EVM → show EVM balance
-                    isLoadingEvmBalance ? (
-                      <span>Loading...</span>
-                    ) : evmBalance !== null ? (
-                      <span className="font-medium text-primary">
-                        {parseFloat(evmBalance).toFixed(4)} {toNetwork.symbol}
-                      </span>
-                    ) : (
-                      <span>0.0000 {toNetwork.symbol}</span>
-                    )
-                  ) : (
-                    // TO network is Substrate → show Substrate balance
+                  {fromType === "EVM" ? (
+                    // FROM EVM → TO Substrate
                     isLoadingSubstrateBalance ? (
                       <span>Loading...</span>
                     ) : substrateBalance !== null ? (
                       <span className="font-medium text-primary">
-                        {substrateBalance} {toNetwork.symbol}
+                        {substrateBalance} {toChain.symbol}
                       </span>
                     ) : (
-                      <span>0.0000 {toNetwork.symbol}</span>
+                      <span>0.0000 {toChain.symbol}</span>
+                    )
+                  ) : (
+                    // FROM Substrate → TO EVM
+                    isLoadingEvmBalance ? (
+                      <span>Loading...</span>
+                    ) : evmBalance !== null ? (
+                      <span className="font-medium text-primary">
+                        {parseFloat(evmBalance).toFixed(4)} {toChain.symbol}
+                      </span>
+                    ) : (
+                      <span>0.0000 {toChain.symbol}</span>
                     )
                   )}
                 </div>
-              )}
 
+                <p className="text-xs text-muted-foreground">
+                  Enter the PolkaVM address where you want to receive your tokens.
+                  Make sure you control this address.
+                </p>
+              </div>
+          )}
 
-
-            <p className="text-xs text-muted-foreground">
-              Enter the PolkaVM address where you want to receive your tokens.
-              Make sure you control this address.
-            </p>
           </div>
 
           {/* Bridge Button */}
