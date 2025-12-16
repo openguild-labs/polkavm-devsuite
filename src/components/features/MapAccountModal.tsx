@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
@@ -11,125 +11,193 @@ import {
   useAccount as usePolkadotAccount,
 } from "@luno-kit/react";
 
-interface MapAccountModalProps {
-  onClose: () => void;
-}
+import { createClient } from "polkadot-api";
+import { getWsProvider } from "polkadot-api/ws-provider/web";
+import { Binary } from "polkadot-api";
+import { useAccountMap } from "@/context/AccountMap";
 
-function shortenAddress(address: string, start = 3, end = 3) {
+/* ---------------- utils ---------------- */
+function shortenAddress(address: string, start = 4, end = 4) {
   if (!address) return "";
-  if (address.length <= start + end + 3) return address;
   return `${address.slice(0, start)}...${address.slice(-end)}`;
 }
 
-export default function MapAccountModal({ onClose }: MapAccountModalProps) {
+/* ---------------- component ---------------- */
+interface MapAccountModalProps {
+  onClose: () => void;
+  evmAddress?: string;
+}
+
+export default function MapAccountModal({
+  onClose,
+  evmAddress,
+}: MapAccountModalProps) {
   const { account: polkadotAccount } = usePolkadotAccount();
+  const { chain: currentChain } = useChain();
+  const chains = useChains();
 
-  const { chain: currentChain } = useChain();      
-  const chains = useChains();                     
+  // ---------------- context ----------------
+  const { mappedAccounts, setMappedAccount } = useAccountMap();
+  const isMapped = evmAddress ? mappedAccounts[evmAddress] : null;
 
-  const [isMapped, setIsMapped] = useState(false);
+  const [selectedNetwork, setSelectedNetwork] = useState<any | null>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [selectedNetwork, setSelectedNetwork] = useState<any | null>(null);
+  // ---------------- filter networks ----------------
+  const AVAILABLE_NETWORKS = useMemo(() => {
+    return (chains as any[])
+      .filter((c) => c.hasRevive)
+      .map((c) => ({
+        id: c.genesisHash,
+        name: c.name,
+        icon: c.chainIconUrl,
+        raw: c,
+      }));
+  }, [chains]);
+
+  const selectedChain = selectedNetwork?.raw;
+
+  // ---------------- check mapped ----------------
+  const checkIsMapped = async (chain: any): Promise<boolean> => {
+    try {
+      if (!evmAddress) return false;
+      const wsUrl = chain?.rpcUrls?.webSocket?.[0];
+      let descriptors = chain?.descriptors;
+      if (!wsUrl || !descriptors) return false;
+
+      // unwrap Promise if needed
+      if (typeof descriptors?.then === "function") {
+        descriptors = await descriptors;
+      } else if (descriptors?.descriptors && typeof descriptors.descriptors.then === "function") {
+        descriptors = await descriptors.descriptors;
+      }
+
+      const client = createClient(getWsProvider(wsUrl));
+      const api = client.getTypedApi(descriptors);
+      const reviveQuery = (api.query as any)?.Revive?.OriginalAccount;
+      if (!reviveQuery) return false;
+
+      const h160 = Binary.fromHex(evmAddress);
+      const original = await reviveQuery.getValue(h160);
+      return original !== undefined && original !== null;
+    } catch (e) {
+      console.warn("checkIsMapped failed:", e);
+      return false;
+    }
+  };
+
+  // ---------------- auto check mapping ----------------
+  useEffect(() => {
+    if (!selectedChain || !evmAddress) return;
+
+    setMappedAccount(evmAddress, null); 
+    checkIsMapped(selectedChain)
+      .then((mapped) => setMappedAccount(evmAddress, mapped))
+      .catch(() => setMappedAccount(evmAddress, false));
+  }, [selectedChain, evmAddress, setMappedAccount]);
+
+  // ---------------- map / unmap ----------------
+  const handleMapUnmap = async () => {
+    if (!polkadotAccount || !selectedChain || !evmAddress) return;
+
+    try {
+      setIsProcessing(true);
+
+      const wsUrl = selectedChain?.rpcUrls?.webSocket?.[0];
+      let descriptors = selectedChain?.descriptors;
+      if (!wsUrl || !descriptors) throw new Error("Chain does not support Revive");
+
+      if (typeof descriptors?.then === "function") {
+        descriptors = await descriptors;
+      } else if (descriptors?.descriptors && typeof descriptors.descriptors.then === "function") {
+        descriptors = await descriptors.descriptors;
+      }
+
+      const client = createClient(getWsProvider(wsUrl));
+      const api = client.getTypedApi(descriptors);
+
+      const reviveTx = (api.tx as any)?.Revive;
+      if (!reviveTx) throw new Error("Revive pallet not found");
+
+      const call = isMapped ? reviveTx.unmapAccount() : reviveTx.mapAccount();
+      await call.signAndSubmit(polkadotAccount);
+
+      // check again & update context
+      const mapped = await checkIsMapped(selectedChain);
+      setMappedAccount(evmAddress, mapped);
+
+      console.log(`✅ ${isMapped ? "Unmapped" : "Mapped"} ${evmAddress} on ${selectedChain.name}`);
+    } catch (e) {
+      console.error("Map/Unmap failed:", e);
+      alert("Transaction failed");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   if (!polkadotAccount) return null;
 
-  const AVAILABLE_NETWORKS = chains.map((c) => ({
-    id: c.genesisHash,
-    name: c.name,
-    symbol: c.nativeCurrency?.symbol || "",
-    icon: c.chainIconUrl,      
-    raw: c,
-  }));
-
-  const handleMapUnmap = async () => {
-    if (!selectedNetwork) {
-      alert("Please select a network first.");
-      return;
-    }
-
-    setIsProcessing(true);
-    await new Promise((res) => setTimeout(res, 600)); 
-    setIsMapped((prev) => !prev);
-    setIsProcessing(false);
-  };
-
+  // ---------------- UI ----------------
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-[1000000] flex items-center justify-center"
+        className="fixed inset-0 z-[100000] flex items-center justify-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
       >
-        {/* Backdrop */}
-        <motion.div
-          className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-          onClick={onClose}
-        />
+        {/* backdrop */}
+        <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
-        {/* Modal */}
+        {/* modal */}
         <motion.div
-          className="relative bg-[#0F1115] rounded-2xl w-[400px] p-6 z-10 shadow-lg flex flex-col gap-6"
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
+          className="relative w-[420px] rounded-2xl bg-[#0F1115] p-6 text-white shadow-xl"
+          initial={{ scale: 0.9 }}
+          animate={{ scale: 1 }}
+          exit={{ scale: 0.9 }}
         >
-          {/* Header */}
+          {/* header */}
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-white">Map Account</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-white text-xl"
-            >
+            <h2 className="text-xl font-semibold">Map Account</h2>
+            <button onClick={onClose}>
               <X />
             </button>
           </div>
 
-          {/* Account Info Block */}
+          {/* account */}
           <div
-            className="flex items-center justify-between p-3 rounded-xl border border-white/10 cursor-pointer hover:bg-white/5"
-            onClick={() => setIsDropdownOpen((prev) => !prev)}
+            className="mt-5 flex cursor-pointer items-center justify-between rounded-xl border border-white/10 p-3"
+            onClick={() => setIsDropdownOpen((p) => !p)}
           >
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <Image
                 src={
                   selectedNetwork?.icon ||
                   currentChain?.chainIconUrl ||
                   "/wallets/polkadot.svg"
                 }
-                alt={selectedNetwork?.name || currentChain?.name || "Chain"}
-                width={36}
-                height={36}
+                alt="chain"
+                width={32}
+                height={32}
                 className="rounded-full"
               />
-
-              <div className="flex flex-col">
-                <span className="text-white font-medium">
-                  {shortenAddress(polkadotAccount?.address || "")}
-                </span>
-                <span className="text-gray-400 text-sm">
-                  {selectedNetwork?.name || "Select Network"}
-                </span>
+              <div>
+                <div className="font-medium">{shortenAddress(polkadotAccount.address)}</div>
+                <div className="text-sm text-gray-400">{selectedNetwork?.name || "Select network"}</div>
               </div>
             </div>
-
-            {isDropdownOpen ? (
-              <ChevronUp className="text-white" />
-            ) : (
-              <ChevronDown className="text-white" />
-            )}
+            {isDropdownOpen ? <ChevronUp /> : <ChevronDown />}
           </div>
 
-          {/* Dropdown */}
+          {/* dropdown */}
           <AnimatePresence>
             {isDropdownOpen && (
               <motion.div
-                className="bg-[#1A1D23] border border-white/10 rounded-xl p-2 flex flex-col gap-1 max-h-64 overflow-y-auto"
-                initial={{ opacity: 0, y: -10 }}
+                className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-white/10 bg-[#1A1D23]"
+                initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
+                exit={{ opacity: 0, y: -8 }}
               >
                 {AVAILABLE_NETWORKS.map((net) => (
                   <button
@@ -138,41 +206,38 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
                       setSelectedNetwork(net);
                       setIsDropdownOpen(false);
                     }}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition ${
-                      selectedNetwork?.id === net.id
-                        ? "bg-primary text-white"
-                        : "text-gray-300 hover:bg-white/10"
-                    }`}
+                    className="flex w-full items-center gap-3 px-4 py-2 hover:bg-white/10"
                   >
                     <Image
                       src={net.icon || "/wallets/polkadot.svg"}
                       alt={net.name}
-                      width={22}
-                      height={22}
-                      className="rounded-full"
+                      width={20}
+                      height={20}
                     />
-
-                    <div className="flex flex-col text-left">
-                      <span className="text-white">{net.name}</span>
-                      <span className="text-gray-400 text-xs">
-                        {net.symbol}
-                      </span>
-                    </div>
+                    <span>{net.name}</span>
                   </button>
                 ))}
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Map/Unmap Button */}
+          {/* status */}
+          {isMapped !== null && (
+            <div className="mt-4 text-sm text-gray-400">
+              Status:{" "}
+              <span className={isMapped ? "text-green-400" : "text-yellow-400"}>
+                {isMapped ? "Mapped" : "Not mapped"}
+              </span>
+            </div>
+          )}
+
+          {/* button */}
           <button
+            disabled={isProcessing || isMapped === null}
             onClick={handleMapUnmap}
-            disabled={isProcessing}
-            className={`w-full py-2 rounded-xl font-medium transition-all duration-200 disabled:opacity-50 ${
-              isMapped
-                ? "bg-red-600 hover:bg-red-700 text-white border border-white"
-                : "bg-[#1A1D23] hover:bg-white/10 text-white border border-white"
-            }`}
+            className={`mt-5 w-full rounded-xl py-2 font-medium transition ${
+              isMapped ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"
+            } disabled:opacity-50`}
           >
             {isProcessing ? "Processing..." : isMapped ? "Unmap" : "Map"}
           </button>

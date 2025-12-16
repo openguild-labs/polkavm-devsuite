@@ -117,39 +117,53 @@ export function usePapiClient() {
 
   // Map account
   const mapAccount = async (): Promise<{ transactionHash: string; status: string; errorMessage: string | null }> => {
-    const { currentChain, client, isReady } = state;
-    if (!isReady || !currentChain || !papiSigner) throw new Error("Client not ready");
+  const { currentChain, client, isReady } = state;
+  if (!isReady || !currentChain || !papiSigner) throw new Error("Client not ready");
 
-    const tx = client.getTypedApi(currentChain.descriptors).tx.Revive.map_account();
+  const tx = client.getTypedApi(currentChain.descriptors).tx.Revive.map_account();
 
-    return new Promise((resolve, reject) => {
-      const subscription = tx.signSubmitAndWatch(papiSigner).subscribe({
-        next: (event: any) => {
-          if (event.type === "txBestBlocksState") {
-            subscription.unsubscribe();
-            resolve({ status: "success", transactionHash: event.txHash, errorMessage: null });
-          }
-        },
-        error: (error: any) => {
+  return new Promise((resolve, reject) => {
+    const subscription = tx.signSubmitAndWatch(papiSigner).subscribe({
+      next: (event: any) => {
+        console.log("🔹 MapAccount TX Event:", event); 
+        if (event.type === "txInBlock") {
+          console.log("✅ Transaction included in block:", event.txHash);
+        }
+        if (event.type === "txBestBlocksState") {
+          console.log("🎉 MapAccount FINALIZED:", event.txHash);
           subscription.unsubscribe();
-          reject(error);
-        },
-      });
+          resolve({ status: "success", transactionHash: event.txHash, errorMessage: null });
+        }
+      },
+      error: (error: any) => {
+        subscription.unsubscribe();
+        console.error("❌ MapAccount FAILED:", error);
+        reject({ status: "failed", transactionHash: "", errorMessage: error?.message || "Unknown error" });
+      },
     });
-  };
+  });
+};
+
 
   // Check mapped account
-  const isMappedAccount = async (): Promise<boolean> => {
-    const { currentChain, client, isReady } = state;
-    if (!isReady || !currentChain) throw new Error("Client not ready");
-    if (!address) throw new Error("Address not found");
+  const isMappedAccount = async (evmAddress: string): Promise<boolean> => {
+  const { currentChain, client, isReady } = state;
+  if (!isReady || !currentChain) return false;
+
+  try {
+    const h160 = Binary.fromHex(evmAddress);
 
     const value = await client
       .getTypedApi(currentChain.descriptors)
-      .query.Revive.OriginalAccount.getValue(ss58ToH160(address));
+      .query.Revive.OriginalAccount.getValue(h160);
 
-    return !!value;
-  };
+    console.log("🔍 isMappedAccount result:", value);
+    return value !== undefined && value !== null;
+  } catch (err) {
+    console.error("isMappedAccount failed:", err);
+    return false;
+  }
+};
 
   // Deposit account
   const depositAccount = async (to: string, value: string): Promise<{ transactionHash: string; status: string; errorMessage: string | null }> => {
@@ -174,7 +188,6 @@ export function usePapiClient() {
           console.log("Deposit tx event data:", event.data);
           if (event.type === "txBestBlocksState") {
             subscription.unsubscribe();
-           // Log balance ví nhận
             client
           .getTypedApi(currentChain.descriptors)
           .query.System.Account.getValue(to)
