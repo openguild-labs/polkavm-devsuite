@@ -1,15 +1,19 @@
 "use client";
 
-import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { useState, useEffect } from "react";
 
 import {
   useChain,
   useChains,
+  usePapiSigner,
   useAccount as usePolkadotAccount,
 } from "@luno-kit/react";
+
+import { usePapiClient } from "@/hooks/usePapiClient";
+import { useReviveAccount } from "@/hooks/useReviveAccount";
 
 interface MapAccountModalProps {
   onClose: () => void;
@@ -23,15 +27,13 @@ function shortenAddress(address: string, start = 3, end = 3) {
 
 export default function MapAccountModal({ onClose }: MapAccountModalProps) {
   const { account: polkadotAccount } = usePolkadotAccount();
+  const { chain: currentChain } = useChain();
+  const chains = useChains();
 
-  const { chain: currentChain } = useChain();      
-  const chains = useChains();                     
-
-  const [isMapped, setIsMapped] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [selectedNetwork, setSelectedNetwork] = useState<any | null>(null);
+  const { client } = usePapiClient();
+  const { data: papiSigner } = usePapiSigner();
+  const { account } = usePolkadotAccount();
+  const address = account?.address;
 
   if (!polkadotAccount) return null;
 
@@ -39,9 +41,29 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
     id: c.genesisHash,
     name: c.name,
     symbol: c.nativeCurrency?.symbol || "",
-    icon: c.chainIconUrl,      
+    icon: c.chainIconUrl,
     raw: c,
   }));
+
+  const initialMapped = client?.isMappedAccount?.(address) ?? false;
+
+  const {
+    isMapped,
+    loading,
+    map,
+    unmap,
+    hasRevive,
+    refresh,
+  } = useReviveAccount({
+    client,
+    chain: currentChain,
+    signer: papiSigner,
+    address,
+    initialMapped,
+  });
+
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedNetwork, setSelectedNetwork] = useState<any | null>(null);
 
   const handleMapUnmap = async () => {
     if (!selectedNetwork) {
@@ -49,10 +71,17 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
       return;
     }
 
-    setIsProcessing(true);
-    await new Promise((res) => setTimeout(res, 600)); 
-    setIsMapped((prev) => !prev);
-    setIsProcessing(false);
+    try {
+      if (isMapped) {
+        await unmap();
+      } else {
+        await map();
+      }
+      await refresh();
+    } catch (err) {
+      console.error("Map / Unmap failed:", err);
+      alert("Transaction failed. Check console for details.");
+    }
   };
 
   return (
@@ -87,7 +116,7 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
             </button>
           </div>
 
-          {/* Account Info Block */}
+          {/* Account Info */}
           <div
             className="flex items-center justify-between p-3 rounded-xl border border-white/10 cursor-pointer hover:bg-white/5"
             onClick={() => setIsDropdownOpen((prev) => !prev)}
@@ -104,17 +133,15 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
                 height={36}
                 className="rounded-full"
               />
-
               <div className="flex flex-col">
                 <span className="text-white font-medium">
-                  {shortenAddress(polkadotAccount?.address || "")}
+                  {shortenAddress(polkadotAccount.address)}
                 </span>
                 <span className="text-gray-400 text-sm">
                   {selectedNetwork?.name || "Select Network"}
                 </span>
               </div>
             </div>
-
             {isDropdownOpen ? (
               <ChevronUp className="text-white" />
             ) : (
@@ -151,12 +178,9 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
                       height={22}
                       className="rounded-full"
                     />
-
                     <div className="flex flex-col text-left">
                       <span className="text-white">{net.name}</span>
-                      <span className="text-gray-400 text-xs">
-                        {net.symbol}
-                      </span>
+                      <span className="text-gray-400 text-xs">{net.symbol}</span>
                     </div>
                   </button>
                 ))}
@@ -164,17 +188,25 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
             )}
           </AnimatePresence>
 
-          {/* Map/Unmap Button */}
+          {/* Map / Unmap Button */}
           <button
             onClick={handleMapUnmap}
-            disabled={isProcessing}
-            className={`w-full py-2 rounded-xl font-medium transition-all duration-200 disabled:opacity-50 ${
-              isMapped
-                ? "bg-red-600 hover:bg-red-700 text-white border border-white"
-                : "bg-[#1A1D23] hover:bg-white/10 text-white border border-white"
+            disabled={!hasRevive || loading || isMapped === null}
+            className={`w-full py-2 rounded-xl font-medium transition-all duration-200 ${
+              !hasRevive
+                ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                : isMapped
+                ? "bg-red-600 hover:bg-red-700"
+                : "bg-[#1A1D23] hover:bg-white/10"
             }`}
           >
-            {isProcessing ? "Processing..." : isMapped ? "Unmap" : "Map"}
+            {!hasRevive
+              ? "This chain does not support mapping"
+              : loading
+              ? "Processing..."
+              : isMapped
+              ? "Unmap"
+              : "Map"}
           </button>
         </motion.div>
       </motion.div>
