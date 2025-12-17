@@ -1,6 +1,6 @@
 // hooks/useEvmCall.ts
 import { useState, useEffect, useRef } from 'react';
-import { useSendTransaction, useWaitForTransactionReceipt, useBalance } from 'wagmi';
+import { useSendTransaction, useWaitForTransactionReceipt, useBalance, useAccount, useChainId } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
 import { Hash } from 'viem'; 
 
@@ -12,63 +12,64 @@ interface UseEvmCallProps {
 export function useEvmCall({ to, value }: UseEvmCallProps) {
   const [txHash, setTxHash] = useState<Hash | undefined>();
   const receiptResolverRef = useRef<((receipt: any) => void) | null>(null);
-  
-  const { sendTransaction, isPending: isSending, error: sendError, reset } = useSendTransaction({
-    mutation: {
-      onSuccess: (hash) => {
-        console.log("🎉 Transaction success callback triggered");
-        console.log("- Transaction hash:", hash);
-        setTxHash(hash);
-      },
-      onError: (error) => {
-        console.error("💥 Transaction error callback triggered:", error);
-      
-      },
-    },
-  });
-  const { data: txReceipt, isLoading: isConfirming } = useWaitForTransactionReceipt({
-    hash: txHash,
-  });
-  const { data: balance, isLoading: isLoadingBalance, refetch: refetchBalance } = useBalance();
 
-  // Log transaction receipt when received and resolve promise
+  const { address: evmAddress } = useAccount();
+  const { sendTransaction, isPending: isSending, error: sendError, reset } =
+    useSendTransaction({
+      mutation: {
+        onSuccess: (hash) => {
+          console.log("🎉 Transaction success callback triggered");
+          setTxHash(hash);
+        },
+        onError: (error) => {
+          console.error("💥 Transaction error callback triggered:", error);
+        },
+      },
+    });
+
+  const { data: txReceipt, isLoading: isConfirming } =
+    useWaitForTransactionReceipt({ hash: txHash });
+
+  const { data: balance, isLoading: isLoadingBalance, refetch: refetchBalance } =
+    useBalance({ address: evmAddress });
+
   useEffect(() => {
     if (txReceipt) {
-      console.log("TxHash:", txHash);
-      console.log("📋 Transaction receipt received:");
-      console.log("- Receipt:", txReceipt);
-      console.log("- Status:", txReceipt.status);
-      console.log("- Block number:", txReceipt.blockNumber);
-      
-      // Resolve the waiting promise if it exists
+      console.log("📋 Transaction receipt received:", txReceipt);
+
       if (receiptResolverRef.current) {
-        console.log("🔓 Resolving receipt promise");
         receiptResolverRef.current(txReceipt);
         receiptResolverRef.current = null;
       }
     }
-  }, [txReceipt, txHash]);
+  }, [txReceipt]);
 
   const execute = async (): Promise<Hash> => {
     console.log("🔄 useEvmCall.execute() called");
-    console.log("- to:", to);
-    console.log("- value:", value);
-    console.log("- parsed value:", parseEther(value));
-    console.log("- isSending:", isSending);
-    console.log("- sendError:", sendError);
-    
+
+    if (!value || value.trim() === "") {
+      throw new Error("Invalid transaction value");
+    }
+
+    let weiValue;
+    try {
+      weiValue = parseEther(value.trim());
+    } catch (err) {
+      console.error("❌ parseEther error:", err);
+      throw err;
+    }
+
     return new Promise((resolve, reject) => {
       console.log("📤 Sending transaction...");
-      
-      // Send the transaction
+
       sendTransaction(
         {
           to,
-          value: parseEther(value),
+          value: weiValue,
         },
         {
           onSuccess: (hash) => {
-            console.log("✅ Transaction sent successfully, hash:", hash);
+            console.log("✅ Transaction sent, hash:", hash);
             resolve(hash);
           },
           onError: (error) => {
@@ -80,18 +81,10 @@ export function useEvmCall({ to, value }: UseEvmCallProps) {
     });
   };
 
-  const waitForReceipt = async (): Promise<any> => {
-    console.log("⏳ waitForReceipt called");
-    
-    // If receipt already exists, return it immediately
-    if (txReceipt) {
-      console.log("✅ Receipt already available:", txReceipt);
-      return txReceipt;
-    }
-    
-    // Otherwise, wait for it
+  const waitForReceipt = async () => {
+    if (txReceipt) return txReceipt;
+
     return new Promise((resolve) => {
-      console.log("🔒 Setting up receipt promise resolver");
       receiptResolverRef.current = resolve;
     });
   };
@@ -102,7 +95,7 @@ export function useEvmCall({ to, value }: UseEvmCallProps) {
   };
 
   return {
-    execute, 
+    execute,
     waitForReceipt,
     txHash,
     txReceipt,
@@ -115,12 +108,15 @@ export function useEvmCall({ to, value }: UseEvmCallProps) {
     value,
     isReady: !isSending && !sendError,
     isLoading: isSending || isConfirming,
-    balance: balance ? {
-      total: balance.value.toString(),
-      formattedTotal: formatEther(balance.value),
-      symbol: balance.symbol,
-      decimals: balance.decimals,
-    } : null,
+    balance:
+      balance
+        ? {
+            total: balance.value.toString(),
+            formattedTotal: formatEther(balance.value),
+            symbol: balance.symbol,
+            decimals: balance.decimals,
+          }
+        : null,
     isLoadingBalance,
     refetchBalance,
   };
