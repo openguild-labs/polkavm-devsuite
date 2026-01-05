@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { useState, useEffect } from "react";
+import {CHAINS, GENESIS_HASH_TO_CHAIN_KEY} from "@/constants";
 
 import {
   useChain,
@@ -43,10 +44,11 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
     symbol: c.nativeCurrency?.symbol || "",
     icon: c.chainIconUrl,
     raw: c,
+    descriptors: CHAINS[GENESIS_HASH_TO_CHAIN_KEY[c.genesisHash]]?.descriptors,
   }));
 
   const initialMapped = client?.isMappedAccount?.(address) ?? false;
-
+  const currentChainDescriptors = CHAINS[GENESIS_HASH_TO_CHAIN_KEY[currentChain?.genesisHash as string]]?.descriptors;
   const {
     isMapped,
     loading,
@@ -59,6 +61,7 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
     chain: currentChain,
     signer: papiSigner,
     address,
+    descriptors: currentChainDescriptors,
     initialMapped,
   });
 

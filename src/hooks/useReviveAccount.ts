@@ -6,12 +6,14 @@ export function useReviveAccount({
   signer,
   address,
   initialMapped,
+  descriptors,
 }: {
   client: any;
   chain: any;
   signer: any;
   address: string | undefined;
   initialMapped?: boolean;
+  descriptors: any;
 }): {
   isMapped: boolean | null;
   loading: boolean;
@@ -27,12 +29,13 @@ export function useReviveAccount({
   const [hasRevive, setHasRevive] = useState(false);
 
   const fetchMappedStatus = useCallback(async () => {
-    if (!client || !chain || !chain.descriptors || !address) return;
 
+    if (!client || !chain || !address) return;
+    
     try {
       setLoading(true);
 
-      const supportsMap = !!chain.descriptors.tx?.Revive?.mapAccount;
+      const supportsMap = await client.getTypedApi(descriptors).tx.Revive.mapAccount;
       setHasRevive(supportsMap);
 
       if (!supportsMap) {
@@ -46,7 +49,7 @@ export function useReviveAccount({
         return;
       }
 
-      const api = client.getTypedApi(chain.descriptors);
+      const api = client.getTypedApi(descriptors);
       if (!api?.query?.Revive?.OriginalAccount) {
         console.warn("Chain does not support Revive or OriginalAccount");
         setIsMapped(false);
@@ -69,7 +72,7 @@ export function useReviveAccount({
     setLoading(true);
     try {
       await client
-        .getTypedApi(chain.descriptors)
+        .getTypedApi(descriptors)
         .tx.Revive.mapAccount()
         .signSubmitAndWatch(signer);
       await fetchMappedStatus();
@@ -83,7 +86,7 @@ export function useReviveAccount({
     setLoading(true);
     try {
       await client
-        .getTypedApi(chain.descriptors)
+        .getTypedApi(descriptors)
         .tx.Revive.unmapAccount()
         .signSubmitAndWatch(signer);
       await fetchMappedStatus();
@@ -95,7 +98,7 @@ export function useReviveAccount({
   // Auto fetch 
   useEffect(() => {
     fetchMappedStatus();
-  }, [fetchMappedStatus]);
+  }, [fetchMappedStatus, descriptors]);
 
   return {
     isMapped,
