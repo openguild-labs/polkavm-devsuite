@@ -183,7 +183,7 @@ export function usePapiClient() {
 
     const tx = client
       .getTypedApi(currentChain.descriptors)
-      .tx.Revive.mapAccount();
+      .tx.Revive.map_account();
 
     return new Promise((resolve, reject) => {
       const sub = tx.signSubmitAndWatch(papiSigner).subscribe({

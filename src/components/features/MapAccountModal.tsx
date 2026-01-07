@@ -15,6 +15,7 @@ import {
 
 import { usePapiClient } from "@/hooks/usePapiClient";
 import { useReviveAccount } from "@/hooks/useReviveAccount";
+import { PolkadotSigner } from "polkadot-api";
 
 interface MapAccountModalProps {
   onClose: () => void;
@@ -59,7 +60,7 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
   } = useReviveAccount({
     client,
     chain: currentChain,
-    signer: papiSigner,
+    signer: papiSigner as PolkadotSigner,
     address,
     descriptors: currentChainDescriptors,
     initialMapped,
@@ -76,9 +77,19 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
 
     try {
       if (isMapped) {
-        await unmap();
+        const result = await unmap();
+        if (result.status === "success") {
+          await refresh();
+        } else {
+          alert(result.errorMessage);
+        }
       } else {
-        await map();
+        const result = await map();
+        if (result.status === "success") {
+          await refresh();
+        } else {
+          alert(result.errorMessage);
+        }
       }
       await refresh();
     } catch (err) {
