@@ -2,7 +2,7 @@ import { useAccount, usePapiSigner, useChain } from "@luno-kit/react";
 import { Binary, createClient } from "polkadot-api";
 import { getWsProvider } from "polkadot-api/ws-provider/web";
 import { useEffect, useState } from "react";
-import { ss58ToH160 } from "@/lib/utils";
+import { convertSS58ToH160, ss58ToH160 } from "@/lib/utils";
 import { CHAINS } from "@/constants";
 import { kah, passet_hub, wah } from "@polkadot-api/descriptors";
 
@@ -52,8 +52,9 @@ export function usePapiClient() {
     }
   };
 
-  const assertChainSupportsRevive = (chain: any) => {
-    if (!chain?.descriptors?.tx?.Revive?.mapAccount) {
+  const assertChainSupportsRevive = (client: any, chain: any) => {
+
+    if (!client?.getTypedApi(chain.descriptors)?.tx?.Revive) {
       throw new Error(
         `Chain ${chain?.name} does NOT support Revive.mapAccount`
       );
@@ -143,7 +144,8 @@ export function usePapiClient() {
       throw new Error("Client not ready or address missing");
     }
 
-    const evmAddress = ss58ToH160(address);
+    const evmAddress = convertSS58ToH160(address);
+
     console.log(" Checking mapping...");
     console.log("Substrate address:", address);
     console.log("Derived EVM (H160):", evmAddress);
@@ -152,9 +154,9 @@ export function usePapiClient() {
 
     const value = await client
       .getTypedApi(currentChain.descriptors)
-      .query.Revive.OriginalAccount.getValue(evmAddress);
+      .query.Revive.OriginalAccount.getValue(Binary.fromHex(evmAddress));
     console.log(" Revive.OriginalAccount storage value:", value);
-    const mapped = value !== null;
+    const mapped = value !== undefined;
     console.log(" Is mapped?", mapped);
 
     return mapped;
@@ -170,7 +172,8 @@ export function usePapiClient() {
       throw new Error("Client not ready");
     }
 
-    assertChainSupportsRevive(currentChain);
+    console.log("Descriptors:", currentChain.descriptors);
+    assertChainSupportsRevive(client, currentChain);
 
     const alreadyMapped = await isMappedAccount();
     if (alreadyMapped) {
@@ -180,10 +183,9 @@ export function usePapiClient() {
         errorMessage: null,
       };
     }
-
     const tx = client
       .getTypedApi(currentChain.descriptors)
-      .tx.Revive.mapAccount();
+      .tx.Revive.map_account();
 
     return new Promise((resolve, reject) => {
       const sub = tx.signSubmitAndWatch(papiSigner).subscribe({

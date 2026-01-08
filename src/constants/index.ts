@@ -26,6 +26,12 @@ export interface Chain {
     };
 }
 
+export const GENESIS_HASH_TO_CHAIN_KEY: Record<string, string> = {
+    '0xfd974cf9eaf028f5e44b9fdd1949ab039c6cf9cc54449b0b60d71b042e79aeb6': 'paseoPassetHub',
+    '0x67f9723393ef76214df0118c34bbbd3dbebc8ed46a10973a8c969d48fe7598c9': 'westendAssetHub',
+    '0x48239ef607d7928874027a43a67689209727dfb3d3dc5e5b03a39bdc2eda771a': 'kusamaAssetHub',
+};
+
 export const CHAINS: Record<string, Chain> = {
     paseoPassetHub: {
         genesisHash: '0xfd974cf9eaf028f5e44b9fdd1949ab039c6cf9cc54449b0b60d71b042e79aeb6',
@@ -76,6 +82,9 @@ export const CHAINS: Record<string, Chain> = {
         descriptors: kah,
     }
 };
+
+// Mapping from genesis hash to chain key for easy lookup
+
 
 
 export interface PolkaVMChainConfig {

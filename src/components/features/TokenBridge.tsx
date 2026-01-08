@@ -355,8 +355,8 @@ export function TokenBridge() {
     if (!isConnected) return "Connect your wallet first…";
 
     return fromType === "EVM"
-      ? "Your EVM address here"
-      : "Your Substrate address here";
+      ? "Your Substrate address here"
+      : "Your EVM address here";
   };
 
   const getAddressLabel = () => {

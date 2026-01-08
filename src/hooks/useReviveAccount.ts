@@ -1,4 +1,13 @@
+import { convertSS58ToH160 } from "@/lib/utils";
+import { Binary, PolkadotSigner } from "polkadot-api";
 import { useEffect, useState, useCallback } from "react";
+
+
+interface MapUnmapResult {
+  transactionHash: string;
+  status: "success" | "error";
+  errorMessage: string | null;
+}
 
 export function useReviveAccount({
   client,
@@ -6,18 +15,20 @@ export function useReviveAccount({
   signer,
   address,
   initialMapped,
+  descriptors,
 }: {
   client: any;
   chain: any;
-  signer: any;
+  signer: PolkadotSigner;
   address: string | undefined;
   initialMapped?: boolean;
+  descriptors: any;
 }): {
   isMapped: boolean | null;
   loading: boolean;
   hasRevive: boolean;
-  map: () => Promise<void>;
-  unmap: () => Promise<void>;
+  map: () => Promise<MapUnmapResult>;
+  unmap: () => Promise<MapUnmapResult>;
   refresh: () => Promise<void>;
 } {
   const [isMapped, setIsMapped] = useState<boolean | null>(
@@ -27,12 +38,15 @@ export function useReviveAccount({
   const [hasRevive, setHasRevive] = useState(false);
 
   const fetchMappedStatus = useCallback(async () => {
-    if (!client || !chain || !chain.descriptors || !address) return;
+
+    if (!client || !chain || !address) return;
+
+    console.log("fetchMappedStatus", client, chain, address);
 
     try {
       setLoading(true);
 
-      const supportsMap = !!chain.descriptors.tx?.Revive?.mapAccount;
+      const supportsMap = await client.getTypedApi(descriptors).tx.Revive.mapAccount;
       setHasRevive(supportsMap);
 
       if (!supportsMap) {
@@ -46,14 +60,17 @@ export function useReviveAccount({
         return;
       }
 
-      const api = client.getTypedApi(chain.descriptors);
+      const api = client.getTypedApi(descriptors);
       if (!api?.query?.Revive?.OriginalAccount) {
         console.warn("Chain does not support Revive or OriginalAccount");
         setIsMapped(false);
         return;
       }
 
-      const value = await api.query.Revive.OriginalAccount.getValue(address);
+      const evmAddress = convertSS58ToH160(address);
+      console.log("evmAddress", evmAddress);
+      const value = await api.query.Revive.OriginalAccount.getValue(Binary.fromHex(evmAddress));
+      console.log("value", value);
       setIsMapped(!!value);
     } catch (err) {
       console.error("Failed to fetch mapped status:", err);
@@ -64,29 +81,85 @@ export function useReviveAccount({
     }
   }, [client, chain, address]);
 
-  const map = async () => {
-    if (!client || !chain || !signer) return;
+  const map = async (): Promise<{
+    transactionHash: string;
+    status: "success" | "error";
+    errorMessage: string | null;
+  }> => {
+    if (!client || !chain || !signer) {
+      return {
+        status: "error",
+        transactionHash: "",
+        errorMessage: "Client not ready",
+      };
+    }
     setLoading(true);
     try {
-      await client
-        .getTypedApi(chain.descriptors)
-        .tx.Revive.mapAccount()
-        .signSubmitAndWatch(signer);
-      await fetchMappedStatus();
+      const tx = client
+        .getTypedApi(descriptors)
+        .tx.Revive.map_account();
+      return new Promise((resolve, reject) => {
+        const sub = tx.signSubmitAndWatch(signer).subscribe({
+          next: (event: any) => {
+            if (event.type === "txBestBlocksState") {
+              sub.unsubscribe();
+              resolve({
+                status: "success",
+                transactionHash: event.txHash,
+                errorMessage: null,
+              });
+            }
+          },
+          error: (err: any) => {
+            sub.unsubscribe();
+            reject(err);
+          },
+        });
+      });
+
+      // await fetchMappedStatus();
     } finally {
       setLoading(false);
     }
   };
 
-  const unmap = async () => {
-    if (!client || !chain || !signer) return;
+  const unmap = async (): Promise<{
+    transactionHash: string;
+    status: "success" | "error";
+    errorMessage: string | null;
+  }> => {
+    if (!client || !chain || !signer) {
+      return {
+        status: "error",
+        transactionHash: "",
+        errorMessage: "Client not ready",
+      };
+    }
     setLoading(true);
     try {
-      await client
-        .getTypedApi(chain.descriptors)
-        .tx.Revive.unmapAccount()
-        .signSubmitAndWatch(signer);
-      await fetchMappedStatus();
+      const tx = await client
+        .getTypedApi(descriptors)
+        .tx.Revive.unmap_account();
+
+      return new Promise((resolve, reject) => {
+        const sub = tx.signSubmitAndWatch(signer).subscribe({
+          next: (event: any) => {
+            if (event.type === "txBestBlocksState") {
+              sub.unsubscribe();
+              resolve({
+                status: "success",
+                transactionHash: event.txHash,
+                errorMessage: null,
+              });
+            }
+          },
+          error: (err: any) => {
+            sub.unsubscribe();
+            reject(err);
+          },
+        });
+      });
+      // await fetchMappedStatus();
     } finally {
       setLoading(false);
     }
@@ -95,7 +168,7 @@ export function useReviveAccount({
   // Auto fetch 
   useEffect(() => {
     fetchMappedStatus();
-  }, [fetchMappedStatus]);
+  }, [fetchMappedStatus, descriptors]);
 
   return {
     isMapped,

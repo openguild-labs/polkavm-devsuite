@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { useState, useEffect } from "react";
+import {CHAINS, GENESIS_HASH_TO_CHAIN_KEY} from "@/constants";
 
 import {
   useChain,
@@ -14,6 +15,7 @@ import {
 
 import { usePapiClient } from "@/hooks/usePapiClient";
 import { useReviveAccount } from "@/hooks/useReviveAccount";
+import { PolkadotSigner } from "polkadot-api";
 
 interface MapAccountModalProps {
   onClose: () => void;
@@ -43,10 +45,11 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
     symbol: c.nativeCurrency?.symbol || "",
     icon: c.chainIconUrl,
     raw: c,
+    descriptors: CHAINS[GENESIS_HASH_TO_CHAIN_KEY[c.genesisHash]]?.descriptors,
   }));
 
   const initialMapped = client?.isMappedAccount?.(address) ?? false;
-
+  const currentChainDescriptors = CHAINS[GENESIS_HASH_TO_CHAIN_KEY[currentChain?.genesisHash as string]]?.descriptors;
   const {
     isMapped,
     loading,
@@ -57,8 +60,9 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
   } = useReviveAccount({
     client,
     chain: currentChain,
-    signer: papiSigner,
+    signer: papiSigner as PolkadotSigner,
     address,
+    descriptors: currentChainDescriptors,
     initialMapped,
   });
 
@@ -73,9 +77,19 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
 
     try {
       if (isMapped) {
-        await unmap();
+        const result = await unmap();
+        if (result.status === "success") {
+          await refresh();
+        } else {
+          alert(result.errorMessage);
+        }
       } else {
-        await map();
+        const result = await map();
+        if (result.status === "success") {
+          await refresh();
+        } else {
+          alert(result.errorMessage);
+        }
       }
       await refresh();
     } catch (err) {
