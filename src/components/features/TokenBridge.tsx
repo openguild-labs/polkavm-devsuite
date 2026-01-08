@@ -1168,10 +1168,12 @@ export function TokenBridge() {
                   <span className="text-sm font-mono text-blue-600 underline">
                     {currentTxHash.slice(0, 6)}...{currentTxHash.slice(-4)}
                   </span>
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                    <ExternalLink className="h-3 w-3" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => navigator.clipboard.writeText(currentTxHash)}
+                  >
                     <Copy className="h-3 w-3" />
                   </Button>
                 </div>
