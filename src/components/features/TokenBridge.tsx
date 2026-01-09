@@ -357,8 +357,8 @@ export function TokenBridge() {
     if (!isConnected) return "Connect your wallet first…";
 
     return fromType === "EVM"
-      ? "Your Substrate address here"
-      : "Your EVM address here";
+      ? "Your EVM address here"
+      : "Your Substrate address here";
   };
 
   const getAddressLabel = () => {
@@ -438,7 +438,6 @@ export function TokenBridge() {
     }
   };
 
-  
   useEffect(() => {
     const validateAddress = getAddressValidation();
     if (!recipientAddress || !validateAddress(recipientAddress) || !toChain) {
@@ -448,19 +447,20 @@ export function TokenBridge() {
     }
     // CASE 1 — FROM EVM → TO SUBSTRATE
     if (fromType === "EVM") {
-      console.log("Fetching Substrate balance for:", recipientAddress);
-      fetchSubstrateBalance(recipientAddress, toChain.genesisHash);
-      setEvmBalance(null);
-      return;
+    console.log("Fetching Substrate balance for:", recipientAddress);
+    // Reset evmBalance
+    setEvmBalance(null);
+    fetchSubstrateBalance(recipientAddress, toChain);
+    return;
     }
     // CASE 2 — FROM SUBSTRATE → TO EVM
     if (fromType === "SUBSTRATE") {
       console.log("Fetching EVM balance for:", recipientAddress);
-      fetchEvmBalance(recipientAddress, toChain.id);
       setSubstrateBalance(null);
+      fetchEvmBalance(recipientAddress, toChain); 
       return;
     }
-  }, [recipientAddress, toChain, fromType]);
+ }, [recipientAddress, toChain, fromType]);
 
 
   const bridgeTokens = async () => {
@@ -606,7 +606,6 @@ export function TokenBridge() {
       setIsBridging(false);
     }
   };
-
 
   return (
     <div className="min-h-screen network-grid">
@@ -1089,24 +1088,14 @@ export function TokenBridge() {
 
             {/* Balance Display */}
             {recipientAddress &&
-              getAddressValidation()(recipientAddress) &&
-              toNetwork && (
-                <div className="text-sm text-muted-foreground flex items-center gap-2">
-                  <span>Balance on {toNetwork.name}:</span>
+            getAddressValidation()(recipientAddress) &&
+            toChain && (
+              <div className="text-sm text-muted-foreground flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span>Balance on {toChain.name}:</span>
 
-                  {isEvmChain(toNetwork) ? (
-                    // TO network is PolkaVM/EVM → show EVM balance
-                    isLoadingEvmBalance ? (
-                      <span>Loading...</span>
-                    ) : evmBalance !== null ? (
-                      <span className="font-medium text-primary">
-                        {parseFloat(evmBalance).toFixed(4)} {toNetwork.symbol}
-                      </span>
-                    ) : (
-                      <span>0.0000 {toNetwork.symbol}</span>
-                    )
-                  ) : (
-                    // TO network is Substrate → show Substrate balance
+                  {fromType === "EVM" ? (
+                    // FROM EVM → TO Substrate
                     isLoadingSubstrateBalance ? (
                       <span>Loading...</span>
                     ) : substrateBalance !== null ? (
@@ -1114,13 +1103,28 @@ export function TokenBridge() {
                         {substrateBalance} {toChain.symbol}
                       </span>
                     ) : (
-                      <span>0.0000 {toNetwork.symbol}</span>
+                      <span>0.0000 {toChain.symbol}</span>
+                    )
+                  ) : (
+                    // FROM Substrate → TO EVM
+                    isLoadingEvmBalance ? (
+                      <span>Loading...</span>
+                    ) : evmBalance !== null ? (
+                      <span className="font-medium text-primary">
+                        {parseFloat(evmBalance).toFixed(4)} {toChain.symbol}
+                      </span>
+                    ) : (
+                      <span>0.0000 {toChain.symbol}</span>
                     )
                   )}
                 </div>
-              )}
 
-
+                <p className="text-xs text-muted-foreground">
+                  Enter the PolkaVM address where you want to receive your tokens.
+                  Make sure you control this address.
+                </p>
+              </div>
+          )}
 
           </div>
 
