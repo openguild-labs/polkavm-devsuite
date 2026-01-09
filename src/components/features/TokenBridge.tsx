@@ -49,6 +49,7 @@ import { getWsProvider } from "polkadot-api/ws-provider/web";
 import { useEvmCall } from "@/hooks/useEvmCall";
 import { convertSS58ToH160} from "@/lib/utils";
 import { EVM_TO_SUBSTRATE, SUBSTRATE_TO_EVM, useEvmChainIcons } from "@/config/chainMapping";
+import { TxHashRow } from "./TxHashRow";
 
 export function TokenBridge() {
   
@@ -188,7 +189,8 @@ export function TokenBridge() {
       txHash: null as string | null,
     },
   });
-  const [currentTxHash, setCurrentTxHash] = useState<string | null>(null);
+  const [mapTxHash, setMapTxHash] = useState<string | null>(null);
+  const [bridgeTxHash, setBridgeTxHash] = useState<string | null>(null);
   const [isReversed, setIsReversed] = useState(false);
   const [isPolkaVMToSubstrate, setIsPolkaVMToSubstrate] = useState(false);
 
@@ -355,8 +357,8 @@ export function TokenBridge() {
     if (!isConnected) return "Connect your wallet first…";
 
     return fromType === "EVM"
-      ? "Your EVM address here"
-      : "Your Substrate address here";
+      ? "Your Substrate address here"
+      : "Your EVM address here";
   };
 
   const getAddressLabel = () => {
@@ -436,34 +438,30 @@ export function TokenBridge() {
     }
   };
 
-  console.log("fromType:", fromType);
-  console.log("evmBalance:", evmBalance);
-  console.log("substrateBalance:", substrateBalance);
-  console.log("toChain:", toChain);
-    
- useEffect(() => {
-  const validateAddress = getAddressValidation();
-  if (!recipientAddress || !validateAddress(recipientAddress) || !toChain) {
-    setEvmBalance(null);
-    setSubstrateBalance(null);
-    return;
-  }
-  // CASE 1 — FROM EVM → TO SUBSTRATE
-  if (fromType === "EVM") {
-  console.log("Fetching Substrate balance for:", recipientAddress);
-  // Reset evmBalance
-  setEvmBalance(null);
-  fetchSubstrateBalance(recipientAddress, toChain);
-  return;
-  }
-  // CASE 2 — FROM SUBSTRATE → TO EVM
-  if (fromType === "SUBSTRATE") {
-    console.log("Fetching EVM balance for:", recipientAddress);
-    setSubstrateBalance(null);
-    fetchEvmBalance(recipientAddress, toChain); 
-    return;
-  }
- }, [recipientAddress, toChain, fromType]);
+  
+  useEffect(() => {
+    const validateAddress = getAddressValidation();
+    if (!recipientAddress || !validateAddress(recipientAddress) || !toChain) {
+      setEvmBalance(null);
+      setSubstrateBalance(null);
+      return;
+    }
+    // CASE 1 — FROM EVM → TO SUBSTRATE
+    if (fromType === "EVM") {
+      console.log("Fetching Substrate balance for:", recipientAddress);
+      fetchSubstrateBalance(recipientAddress, toChain.genesisHash);
+      setEvmBalance(null);
+      return;
+    }
+    // CASE 2 — FROM SUBSTRATE → TO EVM
+    if (fromType === "SUBSTRATE") {
+      console.log("Fetching EVM balance for:", recipientAddress);
+      fetchEvmBalance(recipientAddress, toChain.id);
+      setSubstrateBalance(null);
+      return;
+    }
+  }, [recipientAddress, toChain, fromType]);
+
 
   const bridgeTokens = async () => {
     const validateAddress = getAddressValidation();
@@ -509,7 +507,8 @@ export function TokenBridge() {
     setIsBridging(true);
     setBridgeError(null);
     setShowTransactionDialog(true);
-    setCurrentTxHash(null);
+    setMapTxHash(null);
+    setBridgeTxHash(null);
 
     try {
       // CASE 1: PolkaVM (EVM) → Substrate
@@ -523,7 +522,7 @@ export function TokenBridge() {
 
         console.log("Executing EVM call...");
         const txHash = await evmCall.execute();
-        setCurrentTxHash(txHash);
+        setBridgeTxHash(txHash);
 
         console.log("Waiting for receipt...");
         const receipt = await evmCall.waitForReceipt();
@@ -556,7 +555,7 @@ export function TokenBridge() {
             ...prev,
             call: { status: "completed", txHash: deposit.transactionHash },
           }));
-          setCurrentTxHash(deposit.transactionHash);
+          setBridgeTxHash(deposit.transactionHash);
         }
 
         // Need to map first
@@ -573,7 +572,7 @@ export function TokenBridge() {
             ...prev,
             mapAccount: { status: "completed", txHash: mapRes.transactionHash },
           }));
-          setCurrentTxHash(mapRes.transactionHash);
+          setMapTxHash(mapRes.transactionHash);
 
           // Deposit step
           setTransactionSteps(prev => ({
@@ -587,7 +586,7 @@ export function TokenBridge() {
             ...prev,
             call: { status: "completed", txHash: deposit.transactionHash },
           }));
-          setCurrentTxHash(deposit.transactionHash);
+          setBridgeTxHash(deposit.transactionHash);
         }
       }
 
@@ -599,7 +598,7 @@ export function TokenBridge() {
         setIsBridging(false);
         refreshBalance();
         setAmount("");
-      }, 2000);
+      }, 8000);
 
     } catch (error: any) {
       console.error("Bridge failed:", error);
@@ -1090,14 +1089,24 @@ export function TokenBridge() {
 
             {/* Balance Display */}
             {recipientAddress &&
-            getAddressValidation()(recipientAddress) &&
-            toChain && (
-              <div className="text-sm text-muted-foreground flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span>Balance on {toChain.name}:</span>
+              getAddressValidation()(recipientAddress) &&
+              toNetwork && (
+                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                  <span>Balance on {toNetwork.name}:</span>
 
-                  {fromType === "EVM" ? (
-                    // FROM EVM → TO Substrate
+                  {isEvmChain(toNetwork) ? (
+                    // TO network is PolkaVM/EVM → show EVM balance
+                    isLoadingEvmBalance ? (
+                      <span>Loading...</span>
+                    ) : evmBalance !== null ? (
+                      <span className="font-medium text-primary">
+                        {parseFloat(evmBalance).toFixed(4)} {toNetwork.symbol}
+                      </span>
+                    ) : (
+                      <span>0.0000 {toNetwork.symbol}</span>
+                    )
+                  ) : (
+                    // TO network is Substrate → show Substrate balance
                     isLoadingSubstrateBalance ? (
                       <span>Loading...</span>
                     ) : substrateBalance !== null ? (
@@ -1105,28 +1114,13 @@ export function TokenBridge() {
                         {substrateBalance} {toChain.symbol}
                       </span>
                     ) : (
-                      <span>0.0000 {toChain.symbol}</span>
-                    )
-                  ) : (
-                    // FROM Substrate → TO EVM
-                    isLoadingEvmBalance ? (
-                      <span>Loading...</span>
-                    ) : evmBalance !== null ? (
-                      <span className="font-medium text-primary">
-                        {parseFloat(evmBalance).toFixed(4)} {toChain.symbol}
-                      </span>
-                    ) : (
-                      <span>0.0000 {toChain.symbol}</span>
+                      <span>0.0000 {toNetwork.symbol}</span>
                     )
                   )}
                 </div>
+              )}
 
-                <p className="text-xs text-muted-foreground">
-                  Enter the PolkaVM address where you want to receive your tokens.
-                  Make sure you control this address.
-                </p>
-              </div>
-          )}
+
 
           </div>
 
@@ -1175,22 +1169,18 @@ export function TokenBridge() {
 
           <div className="space-y-4">
             {/* Current Transaction Hash */}
-            {currentTxHash && (
-              <div className="space-y-2">
-                <div className="text-sm font-medium">Current TX:</div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-mono text-blue-600 underline">
-                    {currentTxHash.slice(0, 6)}...{currentTxHash.slice(-4)}
-                  </span>
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                    <ExternalLink className="h-3 w-3" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            )}
+            <div className="space-y-3">
+              {mapTxHash && (
+                <TxHashRow label="Map Account TX" txHash={mapTxHash} />
+              )}
+
+              {bridgeTxHash && (
+                <TxHashRow
+                  label="Bridge Transaction TX"
+                  txHash={bridgeTxHash}
+                />
+              )}
+            </div>
 
             {/* Transaction Steps */}
             <div className="space-y-3">
