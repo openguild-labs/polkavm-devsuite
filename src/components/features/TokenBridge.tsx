@@ -49,6 +49,7 @@ import { getWsProvider } from "polkadot-api/ws-provider/web";
 import { useEvmCall } from "@/hooks/useEvmCall";
 import { convertSS58ToH160 } from "@/lib/utils";
 import { EVM_TO_SUBSTRATE, SUBSTRATE_TO_EVM, useEvmChainIcons } from "@/config/chainMapping";
+import { TxHashRow } from "./TxHashRow";
 
 export function TokenBridge() {
   
@@ -188,7 +189,8 @@ export function TokenBridge() {
       txHash: null as string | null,
     },
   });
-  const [currentTxHash, setCurrentTxHash] = useState<string | null>(null);
+  const [mapTxHash, setMapTxHash] = useState<string | null>(null);
+  const [bridgeTxHash, setBridgeTxHash] = useState<string | null>(null);
   const [isReversed, setIsReversed] = useState(false);
   const [isPolkaVMToSubstrate, setIsPolkaVMToSubstrate] = useState(false);
 
@@ -496,7 +498,8 @@ export function TokenBridge() {
     setIsBridging(true);
     setBridgeError(null);
     setShowTransactionDialog(true);
-    setCurrentTxHash(null);
+    setMapTxHash(null);
+    setBridgeTxHash(null);
 
     try {
       // CASE 1: PolkaVM (EVM) → Substrate
@@ -510,7 +513,7 @@ export function TokenBridge() {
 
         console.log("Executing EVM call...");
         const txHash = await evmCall.execute();
-        setCurrentTxHash(txHash);
+        setBridgeTxHash(txHash);
 
         console.log("Waiting for receipt...");
         const receipt = await evmCall.waitForReceipt();
@@ -543,7 +546,7 @@ export function TokenBridge() {
             ...prev,
             call: { status: "completed", txHash: deposit.transactionHash },
           }));
-          setCurrentTxHash(deposit.transactionHash);
+          setBridgeTxHash(deposit.transactionHash);
         }
 
         // Need to map first
@@ -560,7 +563,7 @@ export function TokenBridge() {
             ...prev,
             mapAccount: { status: "completed", txHash: mapRes.transactionHash },
           }));
-          setCurrentTxHash(mapRes.transactionHash);
+          setMapTxHash(mapRes.transactionHash);
 
           // Deposit step
           setTransactionSteps(prev => ({
@@ -574,7 +577,7 @@ export function TokenBridge() {
             ...prev,
             call: { status: "completed", txHash: deposit.transactionHash },
           }));
-          setCurrentTxHash(deposit.transactionHash);
+          setBridgeTxHash(deposit.transactionHash);
         }
       }
 
@@ -586,7 +589,7 @@ export function TokenBridge() {
         setIsBridging(false);
         refreshBalance();
         setAmount("");
-      }, 2000);
+      }, 8000);
 
     } catch (error: any) {
       console.error("Bridge failed:", error);
@@ -1161,22 +1164,18 @@ export function TokenBridge() {
 
           <div className="space-y-4">
             {/* Current Transaction Hash */}
-            {currentTxHash && (
-              <div className="space-y-2">
-                <div className="text-sm font-medium">Current TX:</div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-mono text-blue-600 underline">
-                    {currentTxHash.slice(0, 6)}...{currentTxHash.slice(-4)}
-                  </span>
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                    <ExternalLink className="h-3 w-3" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            )}
+            <div className="space-y-3">
+              {mapTxHash && (
+                <TxHashRow label="Map Account TX" txHash={mapTxHash} />
+              )}
+
+              {bridgeTxHash && (
+                <TxHashRow
+                  label="Bridge Transaction TX"
+                  txHash={bridgeTxHash}
+                />
+              )}
+            </div>
 
             {/* Transaction Steps */}
             <div className="space-y-3">
