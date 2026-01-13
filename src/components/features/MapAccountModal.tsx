@@ -21,6 +21,15 @@ interface MapAccountModalProps {
   onClose: () => void;
 }
 
+interface NetworkOption {
+  id: string;
+  name: string;
+  symbol: string;
+  icon?: string;
+  raw: any;
+  descriptors?: any;
+}
+
 function shortenAddress(address: string, start = 3, end = 3) {
   if (!address) return "";
   if (address.length <= start + end + 3) return address;
@@ -32,13 +41,6 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
   const { chain: currentChain } = useChain();
   const chains = useChains();
 
-  const { client } = usePapiClient();
-  const { data: papiSigner } = usePapiSigner();
-  const { account } = usePolkadotAccount();
-  const address = account?.address;
-
-  if (!polkadotAccount) return null;
-
   const AVAILABLE_NETWORKS = chains.map((c) => ({
     id: c.genesisHash,
     name: c.name,
@@ -48,6 +50,33 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
     descriptors: CHAINS[GENESIS_HASH_TO_CHAIN_KEY[c.genesisHash]]?.descriptors,
   }));
 
+
+  const { client } = usePapiClient();
+  const { data: papiSigner } = usePapiSigner();
+  const { account } = usePolkadotAccount();
+  const address = account?.address;
+  
+
+  useEffect(() => {
+  if (!currentChain) return;
+
+  setSelectedNetwork((prev) => {
+    if (prev?.id === currentChain.genesisHash) {
+      return prev;
+    }
+
+    return (
+      AVAILABLE_NETWORKS.find(
+        (net) => net.id === currentChain.genesisHash
+      ) ?? null
+    );
+  });
+}, [currentChain?.genesisHash]);
+
+
+  if (!polkadotAccount) return null;
+
+  
   const initialMapped = client?.isMappedAccount?.(address) ?? false;
   const currentChainDescriptors = CHAINS[GENESIS_HASH_TO_CHAIN_KEY[currentChain?.genesisHash as string]]?.descriptors;
   const {
@@ -67,7 +96,13 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
   });
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [selectedNetwork, setSelectedNetwork] = useState<any | null>(null);
+  const [selectedNetwork, setSelectedNetwork] = useState<NetworkOption | null>(null);
+  
+  const isWrongNetwork =
+    !!selectedNetwork &&
+    !!currentChain &&
+    selectedNetwork.id !== currentChain.genesisHash;
+
 
   const handleMapUnmap = async () => {
     if (!selectedNetwork) {
@@ -202,12 +237,27 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
             )}
           </AnimatePresence>
 
+          {isWrongNetwork && (
+            <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+              You are currently connected to{" "}
+              <span className="font-semibold">{currentChain?.name}</span>.
+              <br />
+              Please switch your wallet network to{" "}
+              <span className="font-semibold">{selectedNetwork?.name}</span>.
+            </div>
+          )}
+
           {/* Map / Unmap Button */}
           <button
             onClick={handleMapUnmap}
-            disabled={!hasRevive || loading || isMapped === null}
+            disabled={
+              !hasRevive ||
+              loading ||
+              isMapped == null ||
+              isWrongNetwork
+            }
             className={`w-full py-2 rounded-xl font-medium transition-all duration-200 ${
-              !hasRevive
+              !hasRevive || isWrongNetwork
                 ? "bg-gray-700 text-gray-400 cursor-not-allowed"
                 : isMapped
                 ? "bg-red-600 hover:bg-red-700"
@@ -216,11 +266,14 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
           >
             {!hasRevive
               ? "This chain does not support mapping"
+              : isWrongNetwork
+              ? "Wrong network"
               : loading
               ? "Processing..."
               : isMapped
               ? "Unmap"
               : "Map"}
+
           </button>
         </motion.div>
       </motion.div>
