@@ -50,6 +50,7 @@ import { useEvmCall } from "@/hooks/useEvmCall";
 import { convertSS58ToH160} from "@/lib/utils";
 import { EVM_TO_SUBSTRATE, SUBSTRATE_TO_EVM, useEvmChainIcons } from "@/config/chainMapping";
 import { TxHashRow } from "./TxHashRow";
+import { getDescriptorForChain } from "@/constants/substrate";
 
 export function TokenBridge() {
   
@@ -403,33 +404,49 @@ export function TokenBridge() {
   };
 
   const fetchSubstrateBalance = async (address: string, toChain: any) => {
-    if (!isValidSubstrateAddress(address)) {
-      console.warn("[fetchSubstrateBalance] Invalid Substrate address:", address);
-      setSubstrateBalance(null);
-      return;
-    }
-
-    const wsUrl = toChain?.rpcUrls?.webSocket?.[0];
-    if (!wsUrl) {
-      console.warn("[fetchSubstrateBalance] WebSocket URL missing for chain:", toChain?.name);
-      setSubstrateBalance(null);
-      return;
-    }
-
     setIsLoadingSubstrateBalance(true);
+
     try {
-      const substrateClient = createSubstrateClient(getWsProvider(wsUrl));
-      const api = await (substrateClient as any).getTypedApi(toChain.descriptors);
-      const accountInfo = await api.query.system.account.getValue(address);
+      // 1. Validate address
+      if (!isValidSubstrateAddress(address)) {
+        setSubstrateBalance(null);
+        return;
+      }
 
-      const decimals = toChain.nativeCurrency?.decimals || 12;
-      const free = BigInt(accountInfo.data.free);
-      const frozen = BigInt(accountInfo.data.frozen || 0);
-      const total = free - frozen;
-      const formatted = (Number(total) / 10 ** decimals).toFixed(4);
+      // 2. Get WS endpoint
+      const wsUrl = toChain?.rpcUrls?.webSocket?.[0];
+      if (!wsUrl) {
+        console.warn("[fetchSubstrateBalance] Missing WS RPC:", toChain?.name);
+        setSubstrateBalance(null);
+        return;
+      }
 
-      console.log(`[fetchSubstrateBalance] Balance on ${toChain.name}:`, formatted);
-      setSubstrateBalance(formatted);
+      // 3. Get descriptor 
+      const descriptor = getDescriptorForChain(toChain);
+      if (!descriptor) {
+        throw new Error(`Unsupported Substrate chain: ${toChain?.name}`);
+      }
+
+      // 4. Init client + typed API
+      const client = createSubstrateClient(getWsProvider(wsUrl));
+      const api = await client.getTypedApi(descriptor);
+
+      // 5. Query balance
+      const account = await api.query.System.Account.getValue(address);
+
+      const free = account.data.free; 
+      const decimals = toChain.nativeCurrency?.decimals ?? 12;
+
+      // 6. Safe bigint → decimal formatting
+      const formatted =
+        Number(free / BigInt(10 ** (decimals - 4))) / 10 ** 4;
+
+      console.log(
+        `[fetchSubstrateBalance] ${toChain.name}:`,
+        formatted.toFixed(4)
+      );
+
+      setSubstrateBalance(formatted.toFixed(4));
     } catch (error) {
       console.error("[fetchSubstrateBalance] Failed:", error);
       setSubstrateBalance(null);
@@ -439,29 +456,43 @@ export function TokenBridge() {
   };
 
   useEffect(() => {
-    const validateAddress = getAddressValidation();
-    if (!recipientAddress || !validateAddress(recipientAddress) || !toChain) {
+    if (!recipientAddress || !toChain) {
       setEvmBalance(null);
       setSubstrateBalance(null);
       return;
     }
-    // CASE 1 — FROM EVM → TO SUBSTRATE
+
+    const validateAddress = getAddressValidation();
+    const isValid = validateAddress(recipientAddress);
+
+    // FROM EVM → TO SUBSTRATE
     if (fromType === "EVM") {
-    console.log("Fetching Substrate balance for:", recipientAddress);
-    // Reset evmBalance
-    setEvmBalance(null);
-    fetchSubstrateBalance(recipientAddress, toChain);
-    return;
-    }
-    // CASE 2 — FROM SUBSTRATE → TO EVM
-    if (fromType === "SUBSTRATE") {
-      console.log("Fetching EVM balance for:", recipientAddress);
-      setSubstrateBalance(null);
-      fetchEvmBalance(recipientAddress, toChain); 
+      setEvmBalance(null);
+      setIsLoadingSubstrateBalance(true);
+
+      if (isValid) {
+        fetchSubstrateBalance(recipientAddress, toChain);
+      } else {
+        setSubstrateBalance(null);
+        setIsLoadingSubstrateBalance(false);
+      }
       return;
     }
- }, [recipientAddress, toChain, fromType]);
 
+    // FROM SUBSTRATE → TO EVM
+    if (fromType === "SUBSTRATE") {
+      setSubstrateBalance(null);
+      setIsLoadingEvmBalance(true);
+
+      if (isValid) {
+        fetchEvmBalance(recipientAddress, toChain);
+      } else {
+        setEvmBalance(null);
+        setIsLoadingEvmBalance(false);
+      }
+      return;
+    }
+  }, [recipientAddress, toChain, fromType]);
 
   const bridgeTokens = async () => {
     const validateAddress = getAddressValidation();
