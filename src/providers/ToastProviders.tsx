@@ -1,12 +1,12 @@
 "use client"
 
 import { registerToast } from "@/components/ui/toast-manager"
-import { AlertCircle, CheckCircle2, Info, XCircle } from "lucide-react"
+import { AlertCircle, CheckCircle2, Info, Loader2, XCircle } from "lucide-react"
 import React, { useState, useEffect } from "react"
 
 interface Toast {
   id: number
-  status: "success" | "error" | "info" | "warning"
+  status: "success" | "error" | "info" | "warning"|"loading"
   message: string
 }
 
@@ -53,6 +53,17 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       },
       iconColor: "#3b82f6",
     },
+
+    loading: {
+    icon: Loader2,
+    style: {
+      backgroundColor: "rgba(99, 102, 241, 0.1)",
+      border: "1px solid rgba(99, 102, 241, 0.2)",
+      color: "#6366f1",
+      backdropFilter: "blur(10px)",
+    },
+    iconColor: "#6366f1",
+  },
   };
 
   useEffect(() => {
@@ -70,7 +81,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       {children}
       <div className="fixed bottom-15 right-10 flex flex-col gap-3 z-50 pointer-events-none">
         {toasts.map((toast) => {
-          const config = toastConfig[toast.status];
+          const config = toastConfig[toast.status] ?? toastConfig.info
           const Icon = config.icon;
 
           return (

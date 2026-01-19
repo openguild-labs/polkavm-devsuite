@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import {CHAINS, GENESIS_HASH_TO_CHAIN_KEY} from "@/constants";
 
@@ -16,6 +16,7 @@ import {
 import { usePapiClient } from "@/hooks/usePapiClient";
 import { useReviveAccount } from "@/hooks/useReviveAccount";
 import { PolkadotSigner } from "polkadot-api";
+import { displayToast } from "../ui/toast-manager";
 
 interface MapAccountModalProps {
   onClose: () => void;
@@ -106,30 +107,51 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
 
   const handleMapUnmap = async () => {
     if (!selectedNetwork) {
-      alert("Please select a network first.");
+      displayToast("error", "Please select a network first")
       return;
+    }
+
+    if (isWrongNetwork) {
+      displayToast(
+        "error",
+        `Wrong network. Please switch to ${selectedNetwork.name}`
+      )
+      return
+    }
+
+    if (!hasRevive) {
+      displayToast(
+        "error",
+        "This chain does not support account mapping"
+      )
+      return
     }
 
     try {
       if (isMapped) {
         const result = await unmap();
         if (result.status === "success") {
+          displayToast("success", "Account unmapped successfully")
           await refresh();
+          onClose()
         } else {
-          alert(result.errorMessage);
+          displayToast("error", result.errorMessage || "Unmap failed")
         }
       } else {
+        displayToast("loading", "Mapping account...")
         const result = await map();
         if (result.status === "success") {
+          displayToast("success", "Account mapped successfully")
           await refresh();
+          onClose()
         } else {
-          alert(result.errorMessage);
+          displayToast("error", result.errorMessage || "Map failed")
         }
       }
       await refresh();
     } catch (err) {
       console.error("Map / Unmap failed:", err);
-      alert("Transaction failed. Check console for details.");
+      displayToast("error", "Transaction failed. Please try again.")
     }
   };
 
@@ -144,7 +166,9 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
         {/* Backdrop */}
         <motion.div
           className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-          onClick={onClose}
+          onClick={() => {
+            if (!loading) onClose();
+          }}
         />
 
         {/* Modal */}
@@ -158,8 +182,13 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-white">Map Account</h2>
             <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-white text-xl"
+              onClick={() => {
+                if (!loading) onClose();
+              }}
+              disabled={loading}
+              className={`text-gray-400 hover:text-white text-xl ${
+                loading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             >
               <X />
             </button>
@@ -168,7 +197,11 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
           {/* Account Info */}
           <div
             className="flex items-center justify-between p-3 rounded-xl border border-white/10 cursor-pointer hover:bg-white/5"
-            onClick={() => setIsDropdownOpen((prev) => !prev)}
+            onClick={() => {
+              if (!loading) {
+                setIsDropdownOpen((prev) => !prev)
+              }
+            }}
           >
             <div className="flex items-center gap-4">
               <Image
@@ -256,14 +289,17 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
               isMapped == null ||
               isWrongNetwork
             }
-            className={`w-full py-2 rounded-xl font-medium transition-all duration-200 ${
+            className={`w-full py-2 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
               !hasRevive || isWrongNetwork
                 ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                : loading
+                ? "bg-[#1A1D23] cursor-wait"
                 : isMapped
                 ? "bg-red-600 hover:bg-red-700"
                 : "bg-[#1A1D23] hover:bg-white/10"
             }`}
           >
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             {!hasRevive
               ? "This chain does not support mapping"
               : isWrongNetwork
@@ -273,7 +309,6 @@ export default function MapAccountModal({ onClose }: MapAccountModalProps) {
               : isMapped
               ? "Unmap"
               : "Map"}
-
           </button>
         </motion.div>
       </motion.div>
