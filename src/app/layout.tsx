@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
-import { Toaster } from '@/components/ui/sonner'
 import SubstrateKitProviders from '@/app/SubstrateProvider'
 import { WagmiProvider } from '@/app/WagmiProvider'
 import '@luno-kit/ui/styles.css';
@@ -30,7 +29,6 @@ export default function RootLayout({
             <WagmiProvider>
               <CustomWalletConnect />
               {children}
-              <Toaster />
             </WagmiProvider>
           </SubstrateKitProviders>
         </ToastProvider>
